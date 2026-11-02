@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.daxin/
+.daxin-demo/
+*.egg-info/
+.pytest_cache/
+testkit/private/*
+!testkit/private/.gitignore

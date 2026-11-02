@@ -1,0 +1,14 @@
+[
+ {"id": "FEE-WAIVER-R1", "version": "v1", "topic": "年费免除", "text": "【仿真】示例卡每年刷满 3 笔免年费。", "scope": {"product": "示例卡", "region": "R1"},
+  "facts": [{"key": "fee_waiver.min_purchases", "value": 3, "unit": "笔", "condition": "每年"}], "effective_from": "2025-01-01", "source_ref": "仿真制度 第 3.1 条 v1"},
+ {"id": "FEE-WAIVER-R1", "version": "v2", "topic": "年费免除", "text": "【仿真】示例卡每年刷满 6 笔免年费，自 2026-07-01 起执行。", "scope": {"product": "示例卡", "region": "R1"},
+  "facts": [{"key": "fee_waiver.min_purchases", "value": 6, "unit": "笔", "condition": "每年"}], "effective_from": "2026-07-01", "source_ref": "仿真制度 第 3.1 条 v2"},
+ {"id": "FEE-WAIVER-R2", "version": "v1", "topic": "年费免除", "text": "【仿真】示例卡（R2 地区）每年刷满 12 笔免年费。", "scope": {"product": "示例卡", "region": "R2"},
+  "facts": [{"key": "fee_waiver.min_purchases", "value": 12, "unit": "笔", "condition": "每年"}], "effective_from": "2025-01-01", "source_ref": "仿真制度 第 3.1 条 R2"},
+ {"id": "GRACE-R1", "version": "v1", "topic": "还款日与宽限", "text": "【仿真】账单日后 3 天内还款不算逾期。", "scope": {"product": "示例卡", "region": "R1"},
+  "facts": [{"key": "repay.grace_days", "value": 3, "unit": "天"}], "effective_from": "2025-01-01", "source_ref": "仿真制度 第 4.2 条"},
+ {"id": "ANNUAL-FEE-R1", "version": "v1", "topic": "年费金额", "text": "【仿真】示例卡年费 150 元。", "scope": {"product": "示例卡", "region": "R1"},
+  "facts": [{"key": "annual_fee.amount", "value": 150, "unit": "元"}], "effective_from": "2025-01-01", "source_ref": "仿真收费表 v1"},
+ {"id": "ANNUAL-FEE-R1", "version": "v2", "topic": "年费金额", "text": "【仿真】示例卡年费 200 元，自 2026-07-01 起执行。", "scope": {"product": "示例卡", "region": "R1"},
+  "facts": [{"key": "annual_fee.amount", "value": 200, "unit": "元"}], "effective_from": "2026-07-01", "source_ref": "仿真收费表 v2"}
+]

@@ -1,0 +1,4 @@
+[
+ {"id": "ANNUAL-FEE-R1", "version": "v3", "topic": "年费金额", "text": "【仿真】示例卡年费调整为 220 元，自 2026-12-01 起执行。", "scope": {"product": "示例卡", "region": "R1"},
+  "facts": [{"key": "annual_fee.amount", "value": 220, "unit": "元"}], "effective_from": "2026-12-01", "source_ref": "仿真收费表 v3（公告）"}
+]
