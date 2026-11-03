@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>答信 Daxin 演示</title>
+<meta name="claude:viewport-fit-sides" content="cover">
 <style>
 :root{
   --bg:#f6f5f2; --panel:#ffffff; --panel2:#f0efeb; --line:#dddad3; --ink:#1d1c1a; --mute:#6b675f;
@@ -17,20 +18,20 @@
     --bg:#141413; --panel:#1c1c1a; --panel2:#232321; --line:#34332f; --ink:#ecebe7; --mute:#9b978e;
     --ok:#6cc79a; --ok-bg:#1b3327; --bad:#f08a80; --bad-bg:#3a1f1c; --warn:#e7b85a; --warn-bg:#3a2e14;
     --grey:#b7b3aa; --grey-bg:#2a2a27; --accent:#8db8e3; --accent-bg:#1d2a37;
-    --l1:#6cc79a; --l2:#9fcf7f; --l3:#e7b85a; --l4:#f08a80;
+    --l1:#6cc79a; --l2:#9fcf7f; --l3:#e7b85a; --l4:#f08a80; color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#141413; --panel:#1c1c1a; --panel2:#232321; --line:#34332f; --ink:#ecebe7; --mute:#9b978e;
   --ok:#6cc79a; --ok-bg:#1b3327; --bad:#f08a80; --bad-bg:#3a1f1c; --warn:#e7b85a; --warn-bg:#3a2e14;
   --grey:#b7b3aa; --grey-bg:#2a2a27; --accent:#8db8e3; --accent-bg:#1d2a37;
-  --l1:#6cc79a; --l2:#9fcf7f; --l3:#e7b85a; --l4:#f08a80;
+  --l1:#6cc79a; --l2:#9fcf7f; --l3:#e7b85a; --l4:#f08a80; color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif}
-.wrap{max-width:1180px;margin:0 auto;padding:0 16px 48px}
+.wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
 header{border-bottom:1px solid var(--line);background:var(--panel)}
-header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-top:14px;padding-bottom:14px}
+header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-block:14px}
 .brand{font-weight:700;font-size:18px}
 .brand small{font-weight:400;color:var(--mute);font-size:13px;margin-left:8px}
 .badges{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
@@ -100,6 +101,7 @@ th{color:var(--mute);font-weight:500;font-size:12.5px}
 select,input{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
 pre{background:var(--panel2);border-radius:8px;padding:12px;overflow:auto;max-height:360px;font-family:var(--mono);font-size:12px;line-height:1.5}
 .lock{color:var(--mute)}
+.btn:focus-visible,.tab:focus-visible,.view:focus-visible,.chip:focus-visible,.stepper button:focus-visible,.toggle button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;font:inherit;font-size:13.5px;cursor:pointer}
 .btn.danger{border-color:var(--bad);color:var(--bad)}
 .toast{margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--bad-bg);color:var(--bad);font-size:13.5px}
