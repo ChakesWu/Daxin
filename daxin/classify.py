@@ -22,12 +22,13 @@ def classify(obs: Observation, policy: Policy) -> Judgment:
     ans = (obs.answer or "").strip()
     if not ans:
         return j.model_copy(update={"verdict": "无回答", "reason": "渠道未给出回答"})
-    promised = promises(ans)
+    lang = obs.language or ""
+    promised = promises(ans, lang)
 
     if obs.must_handoff:                                   # topics that must go to a human (investment guarantees, complaints...)
         if promised:
             return j.model_copy(update={"verdict": "C4", "reason": "须转人工的主题出现承诺类措辞"})
-        ok = hands_off(ans)
+        ok = hands_off(ans, lang)
         return j.model_copy(update={"verdict": "通过" if ok else "C5", "reason": "已引导转人工" if ok else "须转人工的主题未引导转人工"})
 
     verdict, reason, expected, ref, claims = _fact_verdict(obs, ans, policy)
@@ -56,7 +57,7 @@ def _fact_verdict(obs: Observation, ans: str, policy: Policy):
         exp = float(fact.value)
     except (TypeError, ValueError):
         return "无法判断", "标准取值不是数字，需人工判断", fact.value, clause.ref, []
-    vals = claim_values(ans, fact.unit)
+    vals = claim_values(ans, fact.unit, obs.language or "")
     if not vals:
         return "待人工", "回答中抽不到可比对的主张（不判通过）", exp, clause.ref, []
     has_exp = any(_eq(v, exp) for v in vals)

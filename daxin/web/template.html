@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>答信 Daxin 演示</title>
+<style>
+:root{
+  --bg:#f6f5f2; --panel:#ffffff; --panel2:#f0efeb; --line:#dddad3; --ink:#1d1c1a; --mute:#6b675f;
+  --ok:#1f7a4d; --ok-bg:#e3f2e9; --bad:#b4372f; --bad-bg:#fbe7e5; --warn:#9a6400; --warn-bg:#fbf0d9;
+  --grey:#5f5b54; --grey-bg:#ecebe7; --accent:#2f5d8a; --accent-bg:#e5eef7;
+  --l1:#1f7a4d; --l2:#4f8a3a; --l3:#b07a10; --l4:#b4372f;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413; --panel:#1c1c1a; --panel2:#232321; --line:#34332f; --ink:#ecebe7; --mute:#9b978e;
+    --ok:#6cc79a; --ok-bg:#1b3327; --bad:#f08a80; --bad-bg:#3a1f1c; --warn:#e7b85a; --warn-bg:#3a2e14;
+    --grey:#b7b3aa; --grey-bg:#2a2a27; --accent:#8db8e3; --accent-bg:#1d2a37;
+    --l1:#6cc79a; --l2:#9fcf7f; --l3:#e7b85a; --l4:#f08a80;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413; --panel:#1c1c1a; --panel2:#232321; --line:#34332f; --ink:#ecebe7; --mute:#9b978e;
+  --ok:#6cc79a; --ok-bg:#1b3327; --bad:#f08a80; --bad-bg:#3a1f1c; --warn:#e7b85a; --warn-bg:#3a2e14;
+  --grey:#b7b3aa; --grey-bg:#2a2a27; --accent:#8db8e3; --accent-bg:#1d2a37;
+  --l1:#6cc79a; --l2:#9fcf7f; --l3:#e7b85a; --l4:#f08a80;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans SC","Microsoft YaHei",sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px 48px}
+header{border-bottom:1px solid var(--line);background:var(--panel)}
+header .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding-top:14px;padding-bottom:14px}
+.brand{font-weight:700;font-size:18px}
+.brand small{font-weight:400;color:var(--mute);font-size:13px;margin-left:8px}
+.badges{display:flex;flex-wrap:wrap;gap:8px;margin-left:auto}
+.badge{font-size:12px;border:1px solid var(--line);border-radius:999px;padding:2px 10px;color:var(--mute);background:var(--panel2)}
+.badge b{color:var(--ink);font-weight:600}
+.badge.ok b{color:var(--ok)}
+.sim{background:var(--warn-bg);color:var(--warn);font-size:13px;padding:6px 16px;text-align:center}
+.views{display:flex;gap:8px;margin:20px 0 6px;flex-wrap:wrap}
+.view{flex:1 1 260px;text-align:left;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;padding:12px 14px;cursor:pointer;font:inherit}
+.view b{display:block;font-size:16px}
+.view span{color:var(--mute);font-size:13px}
+.view[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-bg) inset;background:var(--accent-bg)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;margin:16px 0 12px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:none;color:var(--mute);font:inherit;padding:8px 12px;cursor:pointer;border-bottom:2px solid transparent}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;margin:12px 0}
+.kicker{font-size:12px;letter-spacing:.08em;color:var(--mute);text-transform:uppercase;margin:0 0 8px}
+h2{font-size:18px;margin:0 0 4px}
+p.lead{color:var(--mute);margin:0 0 12px}
+.row{display:flex;gap:16px;flex-wrap:wrap}
+.col{flex:1 1 320px;min-width:0}
+.msg{max-width:760px;margin:10px 0}
+.msg.q{margin-left:auto;background:var(--accent-bg);border-radius:12px 12px 2px 12px;padding:10px 14px;width:fit-content;max-width:85%}
+.msg.a{background:var(--panel2);border-radius:12px 12px 12px 2px;padding:12px 14px}
+.meta{font-size:12px;color:var(--mute);margin-bottom:4px}
+.hl{border-radius:4px;padding:0 2px}
+.hl.ok{background:var(--ok-bg);color:var(--ok);font-weight:600}
+.hl.bad{background:var(--bad-bg);color:var(--bad);font-weight:600;text-decoration:underline wavy}
+.hl.grey{background:var(--grey-bg)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:12.5px;border-radius:999px;padding:1px 10px;margin:0 2px;border:1px solid currentColor;cursor:pointer;background:none;font-family:inherit;vertical-align:1px}
+.chip.ok{color:var(--ok);background:var(--ok-bg)}
+.chip.bad{color:var(--bad);background:var(--bad-bg)}
+.chip.warn{color:var(--warn);background:var(--warn-bg)}
+.chip.grey{color:var(--grey);background:var(--grey-bg)}
+.chip.acc{color:var(--accent);background:var(--accent-bg)}
+.handoff{border:1px dashed var(--warn);background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:8px 12px;margin-top:8px;font-size:14px}
+.pop{position:fixed;z-index:20;max-width:min(440px,calc(100vw - 32px));background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px 16px}
+.pop h3{margin:0 0 8px;font-size:15px}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;font-size:13.5px}
+.kv dt{color:var(--mute)}
+.kv dd{margin:0;word-break:break-all}
+.mono{font-family:var(--mono);font-size:12.5px}
+.link{color:var(--accent);background:none;border:0;padding:0;cursor:pointer;font:inherit;text-decoration:underline}
+.toggle{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;margin:4px 0 8px}
+.toggle button{border:0;background:var(--panel);color:var(--mute);padding:6px 14px;font:inherit;font-size:13.5px;cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--mute);font-weight:500;font-size:12.5px}
+.scroll{overflow-x:auto}
+.lv{display:inline-block;min-width:34px;text-align:center;border-radius:6px;font-weight:700;color:#fff;padding:1px 6px}
+.lv.L1{background:var(--l1)} .lv.L2{background:var(--l2)} .lv.L3{background:var(--l3)} .lv.L4{background:var(--l4)}
+.changed{outline:2px solid var(--warn);outline-offset:2px;border-radius:6px}
+.stepper{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.stepper button{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:8px 12px;font:inherit;font-size:13.5px;cursor:pointer}
+.stepper button[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-bg);font-weight:600}
+.note{font-size:13.5px;color:var(--mute)}
+.chain{display:flex;flex-direction:column;gap:8px}
+.card{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--panel2)}
+.card.bad{border-color:var(--bad);background:var(--bad-bg)}
+.card .st{float:right;font-weight:700}
+.st.ok{color:var(--ok)} .st.bad{color:var(--bad)}
+.grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.stat{background:var(--panel2);border-radius:8px;padding:10px 12px}
+.stat b{display:block;font-size:22px}
+.stat span{font-size:12.5px;color:var(--mute)}
+select,input{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);color:var(--ink)}
+pre{background:var(--panel2);border-radius:8px;padding:12px;overflow:auto;max-height:360px;font-family:var(--mono);font-size:12px;line-height:1.5}
+.lock{color:var(--mute)}
+.btn{border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;padding:6px 12px;font:inherit;font-size:13.5px;cursor:pointer}
+.btn.danger{border-color:var(--bad);color:var(--bad)}
+.toast{margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--bad-bg);color:var(--bad);font-size:13.5px}
+footer{color:var(--mute);font-size:12.5px;margin-top:24px}
+@media (max-width:640px){ .kv{grid-template-columns:80px 1fr} .msg.q{max-width:100%} }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="brand">答信 Daxin<small>银行智能客服回答的第三方验收与分级放行</small></div>
+  <div class="badges" id="badges"></div>
+</div></header>
+<div class="sim">仿真演示：BANK-X 为虚构机构代号，所有制度、问题、回答与数字均为仿真，不代表任何真实机构或系统。</div>
+<main class="wrap">
+  <div class="views" role="group" aria-label="视角">
+    <button class="view" id="v-ext" aria-pressed="true"><b>外部视角 · 客户看到什么</b><span>回答附第三方核对过的出处；不一致或须人工的问题转人工</span></button>
+    <button class="view" id="v-int" aria-pressed="false"><b>内部视角 · 消保、合规、内审看到什么</b><span>判定、证据、复核、放行矩阵、生效前回归、路由策略</span></button>
+  </div>
+  <section id="ext"></section>
+  <section id="int" hidden>
+    <div class="tabs" role="tablist" id="tabs"></div>
+    <div id="tabpanel"></div>
+  </section>
+  <footer>黑盒验收：答信只看问题与回答，不接触被测系统的模型、提示词或知识库。本工具是制度一致性检查与风险提示工具，不构成法律意见。</footer>
+</main>
+<div class="pop" id="pop" hidden role="dialog"></div>
+<script>
+const D = /*__DAXIN_DATA__*/null;
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const VCLS = v => v === "通过" ? "ok" : (/^C[1-4]$/.test(v) ? "bad" : (v === "C5" ? "warn" : "grey"));
+const VNAME = {"C1":"与现行制度矛盾","C2":"引用旧版","C3":"混用其他范围","C4":"越权承诺","C5":"需合规复核","通过":"与现行版本一致","待人工":"抽不到主张，不判通过"};
+let stage = 0;
+
+/* ---------- header ---------- */
+function badges(){
+  const m = D.meta;
+  $("#badges").innerHTML = `
+    <span class="badge">机构 <b>${esc(m.inst)}</b>（仿真）</span>
+    <span class="badge">标准 <b>${m.frozen.length}</b> 个冻结版本</span>
+    <span class="badge">规则 <b>${esc(m.rule_version)}</b></span>
+    <span class="badge ${m.audit_ok ? "ok" : ""}">审计链 <b>${m.audit_ok ? "✓ 校验通过" : "✗ 异常"}</b> · ${m.audit_events} 条</span>`;
+}
+
+/* ---------- popover ---------- */
+const pop = $("#pop");
+function openPop(html, anchor){
+  pop.innerHTML = html; pop.hidden = false;
+  const r = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight;
+  let left = Math.min(Math.max(16, r.left), window.innerWidth - pw - 16);
+  let top = r.bottom + 8; if (top + ph > window.innerHeight - 8) top = Math.max(8, r.top - ph - 8);
+  pop.style.left = left + "px"; pop.style.top = top + "px";
+}
+document.addEventListener("click", e => {
+  if (!pop.hidden && !pop.contains(e.target) && !e.target.closest("[data-pop]")) pop.hidden = true;
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") pop.hidden = true; });
+
+/* ---------- highlighting ---------- */
+function highlight(text, spans, cls){
+  if (!spans || !spans.length) return esc(text);
+  let out = "", i = 0;
+  for (const [s, e] of spans){ out += esc(text.slice(i, s)) + `<span class="hl ${cls}">${esc(text.slice(s, e))}</span>`; i = e; }
+  return out + esc(text.slice(i));
+}
+function numberSpans(text, nums){
+  const spans = [];
+  for (const n of nums || []){
+    const re = new RegExp(`${String(n).replace(/\.0+$/, "")}\\s*(?:元|笔|天|%|个月)?`, "g"); let m;
+    while ((m = re.exec(text))) spans.push([m.index, m.index + m[0].length]);
+  }
+  return spans.sort((a,b)=>a[0]-b[0]).filter((s,i,a)=> i===0 || s[0] >= a[i-1][1]);
+}
+
+/* ---------- external view ---------- */
+let extMode = "after";
+function renderExt(){
+  const el = $("#ext");
+  const turns = D.turns.map((t, i) => {
+    const e = t.external;
+    let body;
+    if (extMode === "before"){
+      body = `<div>${esc(t.answer)}</div>`;
+    } else if (e.action === "show"){
+      const c = e.citations[0];
+      body = `<div>${highlight(e.text, e.spans, "ok")}
+        <button class="chip ok" data-pop="cite" data-i="${i}">出处 · ${esc(c.document)}</button></div>`;
+    } else if (e.action === "handoff"){
+      body = `<div class="handoff">↪ ${esc(e.text)}</div>`;
+    } else {
+      body = `<div>${esc(e.text)} <span class="chip grey">未核对，不附出处</span></div>`;
+    }
+    return `<div class="msg q"><div class="meta">客户 · ${esc(t.channel)} · ${esc(t.region)}</div>${esc(t.question.replace(/^（仿真）/, ""))}</div>
+            <div class="msg a"><div class="meta">BANK-X 智能客服（仿真）</div>${body}</div>`;
+  }).join("");
+  el.innerHTML = `
+    <div class="panel">
+      <p class="kicker">外部视角</p>
+      <h2>同一段对话，客户看到的两个版本</h2>
+      <p class="lead">切换看看：没有答信时，每个回答都流畅自信；接入答信后，只有核对过的主张附出处，其余转人工。</p>
+      <div class="toggle" role="group">
+        <button id="m-before" aria-pressed="${extMode==="before"}">未接入答信</button>
+        <button id="m-after" aria-pressed="${extMode==="after"}">接入答信后</button>
+      </div>
+      ${turns}
+      <p class="note" style="margin-top:14px">出处由答信按冻结的制度版本核对，不是被测系统自己报告的检索来源。错的回答不会被附上出处。
+      <button class="link" id="go-int">切到内部视角，看这些回答被判成什么 →</button></p>
+    </div>`;
+  $("#m-before").onclick = () => { extMode = "before"; renderExt(); };
+  $("#m-after").onclick = () => { extMode = "after"; renderExt(); };
+  $("#go-int").onclick = () => setView("int");
+  el.querySelectorAll('[data-pop="cite"]').forEach(b => b.onclick = ev => {
+    const c = D.turns[+b.dataset.i].external.citations[0];
+    openPop(`<h3>这句话的出处</h3><dl class="kv">
+      <dt>文件</dt><dd>${esc(c.document)}</dd><dt>版本</dt><dd>${esc(c.version)}</dd>
+      <dt>生效日</dt><dd>${esc(c.effective_from)}</dd><dt>条文</dt><dd>${esc(c.statement)}</dd>
+      <dt>核对</dt><dd>${esc(c.checked_by)}</dd></dl>`, b);
+    ev.stopPropagation();
+  });
+}
+
+/* ---------- internal: conversation verdicts ---------- */
+function verdictPop(t){
+  const card = D.chain.find(c => c.id === t.card);
+  return `<h3>${esc(t.verdict)} · ${esc(VNAME[t.verdict] || "")}${t.grade ? " · 风险 " + esc(t.grade) : ""}</h3><dl class="kv">
+    <dt>AI 说</dt><dd>${esc(t.answer)}</dd>
+    <dt>现行标准</dt><dd>${t.expected != null ? esc(t.expected) + "（" + esc(t.clause) + "）" : "—"}</dd>
+    <dt>条文</dt><dd>${esc(t.clause_text || "—")}</dd>
+    <dt>判定理由</dt><dd>${esc(t.reason)}</dd>
+    <dt>机器建议</dt><dd>${esc(t.machine)}（只是建议，不计入统计）</dd>
+    <dt>人工复核</dt><dd>${t.reviewers.map(esc).join("；") || "—"}</dd>
+    <dt>规则版本</dt><dd>${esc(D.meta.rule_version)}</dd>
+    <dt>回答哈希</dt><dd class="mono">${esc(t.sha.slice(0,16))}…</dd>
+    ${t.upcoming && stage >= 1 ? `<dt>生效前预演</dt><dd>按 ${esc(t.upcoming.on)} 起的新标准：<b>${esc(t.upcoming.verdict)}</b>（${esc(t.upcoming.reason)}）</dd>` : ""}
+  </dl>${card ? `<p style="margin:10px 0 0"><button class="link" data-goto-card="${esc(card.id)}">打开证据卡 ↗</button></p>` : ""}`;
+}
+function tabConversation(){
+  const rows = D.turns.map((t, i) => {
+    const cls = VCLS(t.verdict);
+    const spans = numberSpans(t.answer, t.claims);
+    const up = t.upcoming && stage >= 1 && t.verdict === "通过"
+      ? `<button class="chip warn" data-pop="v" data-i="${i}">12-01 起将失效 · 预演 ${esc(t.upcoming.verdict)}</button>` : "";
+    return `<div class="msg q"><div class="meta">${esc(t.question_id)} · ${esc(t.topic)} · ${esc(t.region)} · ${esc(t.channel)}</div>${esc(t.question.replace(/^（仿真）/, ""))}</div>
+      <div class="msg a"><div class="meta">被测回答 ${esc(t.obs_id)} · ${esc(t.ts)}</div>
+      ${highlight(t.answer, spans, cls === "ok" ? "ok" : (cls === "bad" ? "bad" : "grey"))}
+      <button class="chip ${cls}" data-pop="v" data-i="${i}">${esc(t.verdict)} · ${esc(VNAME[t.verdict] || "")}</button>${up}</div>`;
+  }).join("");
+  return `<div class="panel"><p class="kicker">黑盒测试记录 · 判定</p><h2>同一段对话，验收方看到的</h2>
+    <p class="lead">每个主张都按冻结的制度版本判定。点 chip 看依据、理由和复核；画面上没有任何被测系统内部的字段。</p>${rows}</div>`;
+}
+
+/* ---------- internal: observations & review ---------- */
+function tabObservations(){
+  const d = D.meta.dist, total = Object.values(d).reduce((a,b)=>a+b,0);
+  const stats = Object.entries(d).sort().map(([k,v]) => `<div class="stat"><b class="${VCLS(k)==="bad"?"st bad":""}">${v}</b><span>${esc(k)} ${esc(VNAME[k]||"")}</span></div>`).join("");
+  const list = D.observations.filter(o => o.final !== "通过").concat(D.observations.filter(o => o.final === "通过").slice(0, 6));
+  return `<div class="panel"><p class="kicker">观察与人工复核</p><h2>${D.meta.observations} 条观察，只追加</h2>
+    <p class="lead">机器判定只是建议；两名复核人一致才计入统计，分歧记为待人工。下面是首轮 ${total} 条的人工判定分布（仿真复核）。</p>
+    <div class="grid4">${stats}</div></div>
+    <div class="panel"><div class="scroll"><table><thead><tr><th>编号</th><th>时间</th><th>主题</th><th>地区</th><th>回答</th><th>机器建议</th><th>人工判定</th><th>复核人数</th></tr></thead><tbody>
+    ${list.map(o => `<tr><td class="mono">${esc(o.obs_id)}</td><td>${esc(o.ts)}</td><td>${esc(o.topic)}</td><td>${esc(o.region)}</td><td>${esc(o.answer)}</td>
+      <td><span class="chip ${VCLS(o.machine)}">${esc(o.machine)}</span></td><td><span class="chip ${VCLS(o.final)}">${esc(o.final)}</span></td><td>${o.reviewers}</td></tr>`).join("")}
+    </tbody></table></div><p class="note">列出全部差异与前 6 条通过记录。</p></div>`;
+}
+
+/* ---------- internal: standard ---------- */
+function tabStandard(){
+  return `<div class="panel"><p class="kicker">制度基准</p><h2>冻结的标准：只增不改</h2>
+    <p class="lead">条款经确认后冻结，数据库触发器拒绝任何修改；要变只能新增版本。</p>
+    <div class="scroll"><table><thead><tr><th></th><th>条款版本</th><th>主题</th><th>取值</th><th>生效日</th><th>出处</th></tr></thead><tbody>
+    ${D.clauses.map(c => `<tr><td class="lock">🔒</td><td class="mono">${esc(c.ref)}</td><td>${esc(c.topic)}</td><td>${esc(c.facts.join("、"))}</td><td>${esc(c.effective_from)}</td><td>${esc(c.source_ref)}</td></tr>`).join("")}
+    </tbody></table></div>
+    <p style="margin-top:10px"><button class="btn danger" id="try-edit">尝试修改 ANNUAL-FEE-R1@v2</button></p><div id="edit-res"></div></div>`;
+}
+
+/* ---------- internal: release matrix ---------- */
+function stepper(){
+  return `<div class="stepper">${D.stages.map((s,i)=>`<button data-stage="${i}" aria-pressed="${i===stage}">${esc(s.label)}</button>`).join("")}</div>`;
+}
+function tabMatrix(){
+  const s = D.stages[stage], prev = stage ? D.stages[stage-1] : null;
+  const key = r => r.topic + "|" + r.region;
+  const pm = prev ? Object.fromEntries(prev.rows.map(r => [key(r), r])) : {};
+  return `<div class="panel"><p class="kicker">分类分级放行</p><h2>放行矩阵</h2>
+    <p class="lead">只计人工判定；比率取 Wilson 95% 区间下界；样本不足、未关闭高危发现、标准变更未复测、结果过期都只会降级。阈值为示例值。</p>
+    ${stepper()}<p class="note">${esc(s.note)}</p>
+    <div class="scroll"><table><thead><tr><th>主题</th><th>地区</th><th>n</th><th>错</th><th>正确率下界</th><th>等级</th><th>说明</th></tr></thead><tbody>
+    ${s.rows.map(r => { const p = pm[key(r)]; const ch = p && (p.level !== r.level || p.reasons.join() !== r.reasons.join());
+      return `<tr><td>${esc(r.topic)}</td><td>${esc(r.region)}</td><td>${r.n}${p && p.n !== r.n ? ` <span class="note">（原 ${p.n}）</span>` : ""}</td><td>${r.k}</td>
+      <td>${(r.lower_bound*100).toFixed(1)}%</td><td><span class="lv ${r.level} ${ch ? "changed" : ""}">${r.level}</span> ${esc(r.label)}</td><td>${esc(r.reasons.join("；") || "—")}</td></tr>`; }).join("")}
+    </tbody></table></div></div>`;
+}
+
+/* ---------- internal: regression ---------- */
+function tabRegress(){
+  if (stage === 0) return `<div class="panel"><p class="kicker">生效前回归</p><h2>目前没有待生效的新标准</h2>
+    <p class="lead">在“放行矩阵”里点“② 发布新标准”，看答信怎样在生效前找出会出错的回答。</p>${stepper()}</div>`;
+  return D.plans.map(p => {
+    const sum = Object.entries(p.preview_summary).map(([k,v]) => `<span class="chip ${VCLS(k)}">${esc(k)} ${v}</span>`).join(" ");
+    return `<div class="panel"><p class="kicker">生效前回归 · 机器预演，不计入统计</p>
+      <h2>${esc(p.clause)}（${esc(p.topic)}）${esc(p.effective_from)} 生效</h2>
+      <p class="lead">须在 <b>${esc(p.deadline)}</b> 前复测（剩 ${p.days_left} 天）。须复测的问题 ${p.questions.length} 个；已记录的 ${p.recorded_answers} 条回答按新标准预演：${sum}</p>
+      <div class="scroll"><table><thead><tr><th>须复测的问题</th><th>地区</th><th>渠道</th><th>语言</th></tr></thead><tbody>
+      ${p.questions.map(q => `<tr><td>${esc(q.question_id)} ${esc(q.question.replace(/^（仿真）/, ""))}</td><td>${esc(q.region)}</td><td>${esc(q.channel)}</td><td>${esc(q.language)}</td></tr>`).join("")}
+      </tbody></table></div>
+      <p class="note" style="margin-top:10px">预演样例：</p>
+      <div class="scroll"><table><tbody>${p.preview.slice(0,4).map(x => `<tr><td class="mono">${esc(x.obs_id)}</td><td>${esc(x.answer)}</td><td><span class="chip ${VCLS(x.verdict)}">${esc(x.verdict)}</span></td><td>${esc(x.reason)}</td></tr>`).join("")}</tbody></table></div>
+      <p class="note">意思是：如果知识库没在 12-01 前更新，这些回答在生效当天就会变成引用旧版（C2）。</p></div>`;
+  }).join("");
+}
+
+/* ---------- internal: routing ---------- */
+function decide(doc, topic, region){
+  const hits = doc.routes.filter(r => r.topic === topic && (r.region === "" || r.region === region));
+  if (!hits.length) return {...doc.default, why: "未经验收的范围，按默认处理"};
+  const b = hits[0];
+  return {level: b.level, mode: b.mode, why: b.reasons.join("；") || b.label};
+}
+const MODE_CN = {auto:"全自动", ai_draft_human_confirm:"AI 起草，人工确认", ai_answer_offer_handoff:"AI 回答并提示可转人工", human_only:"转人工"};
+function tabRouting(){
+  const doc = D.stages[stage].routing;
+  const topics = [...new Set(doc.routes.map(r => r.topic + "|" + r.region))];
+  return `<div class="panel"><p class="kicker">路由策略</p><h2>放行矩阵 → 智能客服的路由</h2>
+    <p class="lead">答信不进入回答生成，只发布每个范围的放行决定。银行自己的意图路由读这个文件：L4 走人工，L2 走“AI 起草、人工确认”。未列出的范围默认 L4；过期按 L3；文件带 SHA-256，被改动即拒用。</p>
+    ${stepper()}
+    <div class="row"><div class="col">
+      <div class="scroll"><table><thead><tr><th>主题</th><th>地区</th><th>等级</th><th>路由模式</th><th>有效至</th></tr></thead><tbody>
+      ${doc.routes.map(r => `<tr><td>${esc(r.topic)}</td><td>${esc(r.region)}</td><td><span class="lv ${r.level}">${r.level}</span></td><td>${esc(MODE_CN[r.mode])}</td><td>${esc(r.valid_until)}</td></tr>`).join("")}
+      </tbody></table></div>
+      <div style="margin-top:12px"><label class="note">模拟一个进线问题：
+        <select id="rt">${topics.map(t => `<option>${esc(t)}</option>`).join("")}<option>信用卡分期手续费|R1</option></select></label>
+        <div id="rt-out" class="panel" style="margin-top:8px"></div></div>
+    </div><div class="col"><p class="note">routing.json（${esc(doc.schema)} · sha256 <span class="mono">${esc(doc.sha256.slice(0,16))}…</span>）</p>
+      <pre>${esc(JSON.stringify({...doc, routes: doc.routes.slice(0,2), "…": `共 ${doc.routes.length} 条`}, null, 1))}</pre></div></div></div>`;
+}
+
+/* ---------- internal: evidence chain ---------- */
+let tampered = null;
+async function sha256(s){
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+async function chainStatus(){
+  let prev = "0".repeat(64); const out = [];
+  for (const c of D.chain){
+    const canon = tampered === c.id ? c.canon.replace(c.answer, c.answer.replace(/\d+/, m => String(+m + 50))) : c.canon;
+    const h = await sha256(prev + canon); out.push(h === c.hash); prev = h;
+  }
+  return out;
+}
+function tabChain(){
+  return `<div class="panel"><p class="kicker">证据卡 · 链式校验</p><h2>${D.chain.length} 张证据卡，一张接一张</h2>
+    <p class="lead">每张卡的校验值包含上一张。改动任何一张卡的任何一个字，它和它之后的每一张都会校验失败。下面的校验在你的浏览器里实时计算。</p>
+    <p><button class="btn danger" id="tamper">${tampered ? "撤销篡改" : "试着把第一张卡的回答改一个数字"}</button></p>
+    <div class="chain" id="chain"></div></div>`;
+}
+async function fillChain(){
+  const st = await chainStatus();
+  $("#chain").innerHTML = D.chain.map((c, i) => `<div class="card ${st[i] ? "" : "bad"}" id="card-${esc(c.id)}">
+    <span class="st ${st[i] ? "ok" : "bad"}">${st[i] ? "✓ 校验通过" : "✗ 校验失败"}</span>
+    <b>${esc(c.id)}</b> · <span class="chip ${VCLS(c.verdict)}">${esc(c.verdict)} ${esc(VNAME[c.verdict]||"")}</span> · 风险 ${esc(c.grade||"—")}
+    <dl class="kv" style="margin-top:8px">
+      <dt>回答</dt><dd>${esc(tampered === c.id ? c.answer.replace(/\d+/, m => String(+m + 50)) + "（已被篡改）" : c.answer)}</dd>
+      <dt>依据</dt><dd>${esc(c.clause || "—")}；${esc(c.reason)}</dd>
+      <dt>复核人</dt><dd>${esc(c.reviewers.join("、"))}</dd>
+      <dt>规则版本</dt><dd>${esc(c.rule_version)}</dd>
+      <dt>校验值</dt><dd class="mono">${esc(c.hash.slice(0,32))}…</dd></dl></div>`).join("");
+}
+
+/* ---------- internal tabs ---------- */
+const TABS = [["conv","会话判定",tabConversation],["obs","观察与复核",tabObservations],["std","制度基准",tabStandard],
+              ["matrix","放行矩阵",tabMatrix],["regress","生效前回归",tabRegress],["routing","路由策略",tabRouting],["chain","证据链",tabChain]];
+let tab = "conv";
+function renderInt(){
+  $("#tabs").innerHTML = TABS.map(([k,n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${k===tab}">${n}</button>`).join("");
+  $("#tabs").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderInt(); });
+  const panel = $("#tabpanel"); panel.innerHTML = TABS.find(t => t[0] === tab)[2]();
+  panel.querySelectorAll("[data-stage]").forEach(b => b.onclick = () => { stage = +b.dataset.stage; renderInt(); });
+  panel.querySelectorAll('[data-pop="v"]').forEach(b => b.onclick = ev => {
+    openPop(verdictPop(D.turns[+b.dataset.i]), b); ev.stopPropagation();
+    pop.querySelectorAll("[data-goto-card]").forEach(g => g.onclick = () => { pop.hidden = true; tab = "chain"; renderInt();
+      setTimeout(() => { const el = document.getElementById("card-" + g.dataset.gotoCard); if (el) { el.scrollIntoView({block:"center"}); el.classList.add("changed"); } }, 60); });
+  });
+  if (tab === "chain"){ fillChain(); $("#tamper").onclick = () => { tampered = tampered ? null : D.chain[0].id; renderInt(); }; }
+  if (tab === "std") $("#try-edit").onclick = () => { $("#edit-res").innerHTML = `<div class="toast">数据库拒绝：<span class="mono">${esc(D.meta.frozen_error)}</span>。这是生成本页的演示运行中，对已冻结条款执行 UPDATE 时数据库触发器返回的原始信息。</div>`; };
+  if (tab === "routing"){
+    const doc = D.stages[stage].routing, sel = $("#rt");
+    const show = () => { const [t, r] = sel.value.split("|"); const d = decide(doc, t, r);
+      $("#rt-out").innerHTML = `<b>${esc(t)} · ${esc(r)}</b> → <span class="lv ${d.level}">${d.level}</span> ${esc(MODE_CN[d.mode])}<div class="note">${esc(d.why)}</div>`; };
+    sel.onchange = show; show();
+  }
+}
+function setView(v){
+  $("#v-ext").setAttribute("aria-pressed", v === "ext"); $("#v-int").setAttribute("aria-pressed", v === "int");
+  $("#ext").hidden = v !== "ext"; $("#int").hidden = v !== "int"; pop.hidden = true;
+  if (v === "int") renderInt(); else renderExt(); window.scrollTo({top:0});
+}
+$("#v-ext").onclick = () => setView("ext"); $("#v-int").onclick = () => setView("int");
+badges(); renderExt();
+</script>
+</body>
+</html>

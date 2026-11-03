@@ -21,7 +21,7 @@ daxin = "daxin.cli:app"
 include = ["daxin*"]
 
 [tool.setuptools.package-data]
-daxin = ["examples/**/*.json"]
+daxin = ["examples/**/*.json", "web/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

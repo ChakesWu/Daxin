@@ -18,7 +18,9 @@ from .evidence import build as build_cards, markdown, verify as verify_cards
 from .models import Clause, Observation
 from .observe import Store
 from .policy import Policy
+from .regress import plan as regress_plan, text as regress_text
 from .release import NAME, matrix
+from .routing import build as routing_build
 
 REV = ("仿真复核甲", "仿真复核乙")
 BY = ("topic", "region")      # the demo pools the two channels; a real run should keep them apart
@@ -29,10 +31,14 @@ def _clauses(name: str) -> list[Clause]:
     return [Clause(**c) for c in json.loads(p.read_text(encoding="utf-8"))]
 
 
+QUESTIONS = {"Q001": "示例卡怎样可以免年费？", "Q008": "示例卡的年费是多少？", "Q015": "账单日后几天内还款不算逾期？",
+             "Q092": "这款理财产品保本吗？会不会亏？"}
+
+
 def _obs(i: int, ts: str, region: str, topic: str, key: str, qid: str, answer: str, handoff: bool = False, grp: str = "") -> Observation:
     return Observation(obs_id=f"S{i:04d}", ts=ts, inst="BANK-X", region=region, product="示例卡",
                        channel="官网" if i % 2 else "APP", language="zh-Hans", question_id=qid, retest_group=grp, topic=topic,
-                       question="（仿真问题）", answer=answer, fact_key=key, must_handoff=handoff, recorder="仿真记录员")
+                       question=f"（仿真）{QUESTIONS[qid]}", answer=answer, fact_key=key, must_handoff=handoff, recorder="仿真记录员")
 
 
 def simulate(store: Store, start: str, rnd: random.Random, n0: int = 1) -> int:
@@ -79,9 +85,9 @@ def run(workdir: Path, log=print) -> dict:
     try:
         with db.conn() as conn:
             conn.execute("UPDATE clauses SET facts='[]' WHERE id='FEE-WAIVER-R1' AND version='v2'")
-        frozen_ok = False
+        frozen_ok, frozen_err = False, ""
     except Exception as e:
-        frozen_ok = "immutable" in str(e)
+        frozen_ok, frozen_err = "immutable" in str(e), str(e)
     log(f"   尝试改动已冻结条款 → {'被数据库拒绝' if frozen_ok else '未被拒绝（异常）'}；条款冲突数：{len(policy.conflicts())}")
 
     log("\n② 观察与判定：被测智能体回答 → 规则判定（机器建议）→ 人工复核（此处用仿真复核人）")
@@ -102,6 +108,9 @@ def run(workdir: Path, log=print) -> dict:
     for c in _clauses("clause_annual_fee_v3.json"):
         policy.add(c, "制度负责人"); policy.confirm(c.id, c.version, "制度负责人"); policy.freeze(c.id, c.version, "审批人")
     m2 = matrix(policy, store, today=today, group=BY); show([r for r in m2 if r.topic == "年费金额"])
+    plans = regress_plan(policy, store, today)
+    log("   生效前回归（机器预演，不计入统计）：")
+    log("\n".join("   " + x for x in regress_text(plans).splitlines()))
 
     log("\n⑤ 复测：生效后重新测试，按新标准判定")
     nxt = simulate_after_change(store, nxt)
@@ -113,11 +122,16 @@ def run(workdir: Path, log=print) -> dict:
     m3 = matrix(policy, store, today=date(2026, 12, 8), group=BY); show([r for r in m3 if r.topic == "年费金额"])
 
     cards = build_cards(policy, store)
+    route = routing_build(m3, "BANK-X", [c.ref for c in policy.clauses(("frozen",))], audit.head(), generated_at="2026-12-08T00:00:00Z")
+    (Path(workdir) / "routing.json").write_text(json.dumps(route, ensure_ascii=False, indent=1), encoding="utf-8")
+    audit.append("答信", "routing.export", "routing", route["sha256"], {"routes": len(route["routes"])})
+    log(f"\n⑥ 路由策略：放行矩阵已导出 {Path(workdir) / 'routing.json'}（{len(route['routes'])} 条范围；未列出的范围默认 L4 人工）")
     ok_chain, bad = audit.verify()
-    log(f"\n⑥ 证据与审计：证据卡 {len(cards)} 张，链校验 {'通过' if verify_cards(cards) else '失败'}；审计链 {'通过' if ok_chain else f'第 {bad} 条异常'}，共 {len(audit.events())} 条事件")
+    log(f"\n⑦ 证据与审计：证据卡 {len(cards)} 张，链校验 {'通过' if verify_cards(cards) else '失败'}；审计链 {'通过' if ok_chain else f'第 {bad} 条异常'}，共 {len(audit.events())} 条事件")
     out = Path(workdir) / "evidence_cards.md"; out.write_text(markdown(cards), encoding="utf-8")
     log(f"   证据卡已写入 {out}")
     return {"frozen_enforced": frozen_ok, "dist": dist, "before": m1, "after_change": m2, "after_retest": m3, "cards": cards,
+            "plans": plans, "routing": route, "frozen_error": frozen_err, "policy": policy, "store": store, "audit": audit,
             "audit_ok": ok_chain, "evidence_ok": verify_cards(cards)}
 
 
@@ -125,7 +139,7 @@ def simulate_after_change(store: Store, n0: int) -> int:
     i = n0
     for k in range(40):
         store.add(Observation(obs_id=f"S{i:04d}", ts=f"2026-12-{4 + k // 20:02d} {8 + (k % 20) // 2:02d}:{(k % 2) * 30:02d}", inst="BANK-X", region="R1", product="示例卡",
-                              channel="官网" if k % 2 else "APP", language="zh-Hans", question_id="Q008", topic="年费金额", question="（仿真问题）",
+                              channel="官网" if k % 2 else "APP", language="zh-Hans", question_id="Q008", topic="年费金额", question=f"（仿真）{QUESTIONS['Q008']}",
                               answer="示例卡年费为 220 元。", fact_key="annual_fee.amount", recorder="仿真记录员"), "simulated-agent")
         i += 1
     return i

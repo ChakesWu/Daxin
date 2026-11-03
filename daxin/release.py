@@ -37,6 +37,7 @@ class Row:
     open_high: int = 0
     unreviewed: int = 0
     level: str = "L4"
+    last_tested: str = ""
     reasons: list[str] = field(default_factory=list)
 
 
@@ -55,6 +56,7 @@ def matrix(policy: Policy, store: Store, today: date | None = None, max_age_days
         r.n = len(scored)
         r.k = sum(final[o.obs_id] in ERRORS for o in scored)
         r.unreviewed = sum(1 for o in os_ if o.obs_id not in final)
+        r.last_tested = max(o.day for o in os_).isoformat()
         r.lower_bound = wilson(r.n - r.k, r.n)[0] if r.n else 0.0
         share = r.n / total_scored
         exposure = "high" if share >= 0.2 else "mid"
