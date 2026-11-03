@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>答信 Daxin 演示</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+/* Layout: sticky topbar; desk = context aside + support desk (MemGuard-style); console = tabbed acceptance views. Single dark look. */
+:root{
+  color-scheme:dark;
+  --bg:#101010; --surface:#151515; --raised:#1a1a1a; --hover:#202020;
+  --border:#2d2d2d; --border-strong:#3c3c3c;
+  --text:#f3f3f0; --soft:#d7d7d2; --muted:#999993; --faint:#686864;
+  --blue:#4f8cff; --ok:#65c489; --warn:#e1b36b; --bad:#ef7777;
+  --ok-a:rgba(101,196,137,.10); --warn-a:rgba(225,179,107,.10); --bad-a:rgba(239,119,119,.10);
+  --sans: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--bg);color:var(--text)}
+body{margin:0;font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:40;background:#111}
+::selection{background:rgba(79,140,255,.35)}
+button{font:inherit}
+.eyebrow{margin:0;color:var(--muted);font-size:.66rem;font-weight:500;letter-spacing:.2em;text-transform:uppercase}
+.btn{border:1px solid var(--border-strong);border-radius:0;background:transparent;color:var(--soft);cursor:pointer;padding:.6rem .85rem;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;transition:border-color .14s,color .14s,background .14s}
+.btn:hover{border-color:var(--text);color:var(--text)}
+.btn[aria-pressed="true"],.btn--primary{border-color:var(--text);background:var(--text);color:#111}
+.btn--danger{border-color:rgba(239,119,119,.5);color:var(--bad)}
+.btn:focus-visible,.starter:focus-visible,.chip:focus-visible,.tab:focus-visible,.link:focus-visible,textarea:focus-visible,select:focus-visible,.seg button:focus-visible{outline:1px solid var(--blue);outline-offset:2px}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:.8rem 1.5rem;min-height:4.5rem;border-bottom:1px solid var(--border);background:rgba(17,17,17,.96);backdrop-filter:blur(16px);padding-block:.8rem;padding-left:max(1.4rem,env(safe-area-inset-left,0px));padding-right:max(1.4rem,env(safe-area-inset-right,0px))}
+.brand{display:flex;align-items:center;gap:1.1rem;white-space:nowrap}
+.wordmark{font-size:.95rem;font-weight:500;letter-spacing:.24em}
+.wordmark b{font-weight:600;letter-spacing:.08em;margin-left:.5rem}
+.product{border-left:1px solid var(--border-strong);color:var(--muted);padding-left:1.1rem;font-size:.64rem;letter-spacing:.17em}
+.actions{display:flex;flex-wrap:wrap;gap:.5rem}
+.simbar{border-bottom:1px solid var(--border);color:var(--warn);font-size:.72rem;letter-spacing:.04em;padding-block:.45rem;padding-left:max(1.4rem,env(safe-area-inset-left,0px));padding-right:max(1.4rem,env(safe-area-inset-right,0px));background:#131210}
+.shell{display:grid;grid-template-columns:minmax(17rem,.7fr) minmax(0,1.6fr);max-width:1280px;margin:0 auto;border-left:1px solid var(--border);border-right:1px solid var(--border);min-height:calc(100vh - 7rem)}
+.context{padding:2.6rem 2rem;border-right:1px solid var(--border);background:rgba(21,21,21,.7);min-width:0}
+.context h1{max-width:18ch;margin:.6rem 0 1rem;font-size:clamp(1.8rem,3vw,2.7rem);font-weight:500;line-height:1.08;letter-spacing:-.03em;text-wrap:balance}
+.context>p{color:var(--muted);line-height:1.7;margin:0}
+.facts{display:grid;gap:.7rem;margin:2rem 0}
+.facts div{display:grid;gap:.15rem;padding-bottom:.65rem;border-bottom:1px solid var(--border)}
+.facts dt{color:var(--muted);font-size:.68rem;letter-spacing:.1em;text-transform:uppercase}
+.facts dd{margin:0;font-size:.9rem}
+.facts dd .ok{color:var(--ok)}
+.starters{display:grid;gap:.5rem}
+.starter{display:flex;justify-content:space-between;gap:1rem;width:100%;padding:.8rem .9rem;color:var(--text);border:1px solid var(--border);background:transparent;text-align:left;cursor:pointer}
+.starter:hover{border-color:var(--ok);background:rgba(101,196,137,.06)}
+.starter small{color:var(--muted);font-size:.72rem;white-space:nowrap}
+.starter.used{color:var(--muted)}
+.hint{margin-top:1rem;color:var(--faint);font-size:.76rem}
+.chat{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-width:0;position:sticky;top:calc(4.5rem + env(safe-area-inset-top,0px));height:calc(100vh - 7rem - env(safe-area-inset-top,0px));align-self:start}
+.chat-head{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:1.5rem 2rem;border-bottom:1px solid var(--border)}
+.chat-head h2{margin:.25rem 0 0;font-size:1.1rem;font-weight:600}
+.status{display:inline-flex;align-items:center;gap:.55rem;margin-right:.35rem;color:var(--ok);font-size:.65rem;letter-spacing:.08em;text-transform:uppercase}
+.status::before{content:"";width:.42rem;height:.42rem;border-radius:50%;background:currentColor}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--border-strong);margin-bottom:1.6rem}
+.seg button{border:0;background:transparent;color:var(--muted);padding:.65rem .5rem;font-size:.74rem;letter-spacing:.04em;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--text);color:#111}
+.messages{display:flex;flex-direction:column;gap:1rem;padding:2rem;overflow-y:auto;min-width:0}
+.empty{max-width:28rem;margin:auto;color:var(--muted);text-align:center;line-height:1.65}
+.empty span{display:grid;place-items:center;width:2.6rem;height:2.6rem;margin:0 auto 1rem;border:1px solid var(--border);border-radius:50%;color:var(--ok)}
+.msg{max-width:min(42rem,85%);padding:1rem 1.1rem;border:1px solid var(--border);line-height:1.55}
+.msg--user{align-self:flex-end;border-color:#3b5b47;background:rgba(101,196,137,.10)}
+.msg--bot{align-self:flex-start;background:var(--surface)}
+.label{display:block;margin-bottom:.45rem;color:var(--muted);font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.msg p{margin:0}
+.answer{line-height:1.75;overflow-wrap:anywhere}
+.evbar{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .7rem;margin-bottom:.8rem;padding-bottom:.7rem;border-bottom:1px solid var(--border);font-size:.7rem}
+.pill{display:inline-flex;align-items:center;padding:.22rem .45rem;border:1px solid var(--border-strong);color:var(--soft);font-size:.65rem;letter-spacing:.07em;text-transform:uppercase}
+.pill.ok{border-color:#3b5b47;color:var(--ok)} .pill.bad{border-color:#6a3a3a;color:var(--bad)} .pill.warn{border-color:#5f4f35;color:var(--warn)} .pill.grey{color:var(--muted)}
+.link{background:none;border:0;padding:0;color:var(--soft);cursor:pointer;font-size:.7rem;text-decoration:underline;text-decoration-color:var(--border-strong);text-underline-offset:.2rem}
+.link:hover{color:var(--ok);text-decoration-color:var(--ok)}
+.chip{display:inline-flex;align-items:center;gap:.35rem;margin:0 .16rem;padding:.08rem .45rem;border:1px solid #438d67;border-radius:.42rem;background:#17271f;color:#c8d1ca;font:inherit;font-size:.72em;line-height:1.55;vertical-align:.12em;cursor:pointer}
+.chip::before{content:"▤";color:#65c18b;font-size:.9em}
+.chip:hover,.chip[aria-expanded="true"]{border-color:#64bd8b;background:#1b3327;color:#f2f6f3}
+.chip.bad{border-color:#8d4343;background:#271717;color:#d8c8c8} .chip.bad::before{color:var(--bad)}
+.chip.bad:hover,.chip.bad[aria-expanded="true"]{border-color:#c46a6a;background:#331b1b;color:#f6f2f2}
+.chip.warn{border-color:#8d7243;background:#272117;color:#d8d0c2} .chip.warn::before{color:var(--warn)}
+.chip.grey{border-color:var(--border-strong);background:var(--raised);color:var(--muted)} .chip.grey::before{color:var(--muted)}
+.claim-ok{color:var(--text)} .claim-bad{color:var(--bad);text-decoration:underline wavy;text-underline-offset:.25rem}
+.handoff{border:1px solid #5f4f35;background:rgba(225,179,107,.07);padding:.9rem 1rem}
+.handoff p{margin:.35rem 0 0;color:var(--soft);line-height:1.55}
+.composer{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.8rem;padding:1.2rem 2rem;border-top:1px solid var(--border);background:var(--surface)}
+.composer textarea{min-height:3.3rem;resize:vertical;padding:.8rem;color:var(--text);border:1px solid var(--border);background:transparent;font:inherit;line-height:1.4;border-radius:0}
+.composer textarea:focus{outline:1px solid var(--ok);border-color:var(--ok)}
+.composer .btn{align-self:end}
+span.chip{cursor:default}
+.btn:disabled{opacity:.45;cursor:default}
+.pop{position:fixed;z-index:50;width:min(28rem,calc(100vw - 2rem));padding:1rem 1.15rem;border:1px solid #414141;border-radius:.55rem;background:#171717;box-shadow:0 14px 38px #0009;color:#ececec;font-size:.78rem}
+.pop::after{content:"";position:absolute;left:var(--ax,50%);width:.75rem;height:.75rem;transform:translateX(-50%) rotate(45deg);background:#171717;bottom:-.42rem;border-right:1px solid #414141;border-bottom:1px solid #414141}
+.pop.below::after{bottom:auto;top:-.42rem;border:0;border-left:1px solid #414141;border-top:1px solid #414141}
+.pop h3{margin:0 0 .45rem;font-size:.96rem;font-weight:600}
+.pop .rows div{display:flex;justify-content:space-between;gap:1rem;padding:.48rem 0;border-top:1px solid #333;font-size:.78rem}
+.pop .rows dt{color:#999;flex:none} .pop .quote{margin:.65rem 0;padding-left:.7rem;border-left:2px solid #438d67;color:#bdbdbd;font-size:.78rem}
+.pop .link{color:#5596ff;text-decoration:none;font-size:.78rem} .pop .link:hover{text-decoration:underline}
+.rows{display:grid;margin:0}
+.rows div{display:grid;grid-template-columns:7rem minmax(0,1fr);gap:1rem;padding:.55rem 0;border-top:1px solid var(--border);font-size:.84rem}
+.rows dt{color:var(--muted)} .rows dd{margin:0;text-align:right;word-break:break-all}
+.quote{margin:.8rem 0 .2rem;color:var(--soft);font-size:.84rem}
+.mono{font-family:var(--mono);font-size:.78rem}
+.console{max-width:1280px;margin:0 auto;border-left:1px solid var(--border);border-right:1px solid var(--border);min-height:calc(100vh - 7rem)}
+.console-head{padding:2rem;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:1rem 2rem;align-items:flex-end;justify-content:space-between}
+.console-head h1{margin:.4rem 0 0;font-size:clamp(1.5rem,2.6vw,2.2rem);font-weight:500;letter-spacing:-.03em}
+.kpis{display:flex;flex-wrap:wrap}
+.kpi{border:1px solid var(--border);margin:-1px 0 0 -1px;padding:.7rem 1rem;min-width:7.5rem}
+.kpi b{display:block;font-size:1.35rem;font-weight:500;font-variant-numeric:tabular-nums}
+.kpi span{color:var(--muted);font-size:.68rem;letter-spacing:.08em}
+.kpi.bad b{color:var(--bad)} .kpi.ok b{color:var(--ok)}
+.tabs{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:0 1.2rem}
+.tab{border:0;background:none;color:var(--muted);padding:.9rem;cursor:pointer;font-size:.8rem;border-bottom:1px solid transparent;margin-bottom:-1px}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--text)}
+.pane{padding:1.6rem 2rem 3rem}
+.pane h2{margin:.3rem 0 .4rem;font-size:1.15rem;font-weight:500}
+.pane .lead{color:var(--muted);margin:0 0 1.2rem;max-width:62rem}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.84rem;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:.6rem .7rem;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--muted);font-weight:500;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase}
+.lv{display:inline-block;min-width:2.4rem;text-align:center;border:1px solid currentColor;padding:0 .4rem;font-weight:600;font-size:.78rem}
+.lv.L1{color:var(--ok)} .lv.L2{color:#9fd27f} .lv.L3{color:var(--warn)} .lv.L4{color:var(--bad)}
+.changed{box-shadow:0 0 0 2px var(--warn)}
+.steps{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
+.note{color:var(--muted);font-size:.82rem}
+.cards{display:grid;gap:.6rem}
+.card{border:1px solid var(--border);background:var(--surface);padding:.9rem 1rem}
+.card.bad{border-color:rgba(239,119,119,.6);background:#1a1212}
+.card .st{float:right;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase}
+.st.ok{color:var(--ok)} .st.bad{color:var(--bad)}
+.toast{margin-top:.8rem;border:1px solid rgba(239,119,119,.55);background:#1a1212;color:var(--bad);padding:.7rem .9rem;font-size:.84rem}
+pre{background:var(--surface);border:1px solid var(--border);padding:1rem;overflow:auto;max-height:22rem;font:12px/1.5 var(--mono);color:var(--soft)}
+select{background:var(--surface);color:var(--text);border:1px solid var(--border-strong);padding:.45rem .6rem;border-radius:0}
+.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1.6rem}
+footer{max-width:1280px;margin:0 auto;border:1px solid var(--border);border-top:0;color:var(--faint);font-size:.74rem;padding-block:1rem;padding-left:max(2rem,env(safe-area-inset-left,0px));padding-right:max(2rem,env(safe-area-inset-right,0px))}
+@media (max-width:860px){
+  .shell,.two{grid-template-columns:1fr}
+  .context{border-right:0;border-bottom:1px solid var(--border)}
+  .context,.chat-head,.messages,.composer,.console-head,.pane{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .msg{max-width:100%}
+  .composer{grid-template-columns:1fr}
+  .chat{position:static;height:85vh}
+  .topbar{position:relative;top:0}
+  .rows div{grid-template-columns:5.5rem minmax(0,1fr)}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="wordmark">DAXIN<b>答信</b></span><span class="product">ANSWER ACCEPTANCE DEMO</span></div>
+  <nav class="actions" aria-label="页面">
+    <button class="btn" id="nav-desk" aria-pressed="true">客服台</button>
+    <button class="btn" id="nav-console" aria-pressed="false">验收控制台</button>
+    <button class="btn" id="reset">新对话</button>
+  </nav>
+</header>
+<div class="simbar">仿真演示 · BANK-X 为虚构机构代号 · 所有制度、问题、回答与数字均为仿真，来自一次实际运行，不代表任何真实机构或系统</div>
+<main id="view-desk" class="shell" aria-label="客服台">
+  <aside class="context">
+    <p class="eyebrow">离线仿真 · 黑盒验收</p>
+    <h1>让银行<br>敢放开 AI 回答。</h1>
+    <p>同一段客服对话，客户看到的和验收方看到的不一样。答信只看问题和回答，按冻结的制度版本逐条核对。</p>
+    <dl class="facts" id="facts"></dl>
+    <p class="eyebrow" style="margin-bottom:.6rem">切换视角</p>
+    <div class="seg" role="group" aria-label="视角">
+      <button id="mode-int" aria-pressed="true">验收方看到的</button>
+      <button id="mode-ext" aria-pressed="false">客户看到的</button>
+    </div>
+    <p class="eyebrow" style="margin-bottom:.6rem">试一个情景</p>
+    <div class="starters" id="starters"></div>
+    <p class="hint">也可以在右下角直接输入，例如“年费多少”“几天内还款”“理财保本吗”。</p>
+  </aside>
+  <section class="chat">
+    <header class="chat-head">
+      <div><p class="eyebrow">BANK-X 客服台 · 固定仿真对话</p><h2>Support desk</h2></div>
+      <span class="status">Demo ready</span>
+    </header>
+    <div class="messages" id="messages" aria-live="polite"></div>
+    <form class="composer" id="composer">
+      <textarea id="draft" placeholder="问一个示例卡的问题，例如：年费是多少？" rows="3" aria-label="输入问题"></textarea>
+      <button type="submit" class="btn btn--primary" id="send" disabled>Send</button>
+    </form>
+  </section>
+</main>
+<main id="view-console" class="console" hidden aria-label="验收控制台">
+  <div class="console-head">
+    <div><p class="eyebrow">内部视角 · 消保、合规、内审</p><h1>验收控制台</h1></div>
+    <div class="kpis" id="kpis"></div>
+  </div>
+  <div class="tabs" role="tablist" id="tabs"></div>
+  <div class="pane" id="pane"></div>
+</main>
+<footer>黑盒验收：答信不接触被测系统的模型、提示词或知识库。本工具是制度一致性检查与风险提示工具，不构成法律意见。</footer>
+<div class="pop" id="pop" hidden role="dialog"></div>
+<script>
+const D = /*__DAXIN_DATA__*/null;
+const $ = (s, el=document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const VCLS = v => v === "通过" ? "ok" : (/^C[1-4]$/.test(v) ? "bad" : (v === "C5" ? "warn" : "grey"));
+const VNAME = {"C1":"与现行制度矛盾","C2":"引用旧版","C3":"混用其他范围","C4":"越权承诺","C5":"需合规复核","通过":"与现行版本一致","待人工":"抽不到主张，不判通过"};
+const Q = t => t.question.replace(/^（仿真）/, "");
+const SCEN = {"通过":"答对 · 附出处","C1":"与现行制度矛盾","C2":"引用旧版","C3":"混用其他地区规则","C4":"越权承诺"};
+
+const pop = $("#pop");
+let popAnchor = null;
+function closePop(){ pop.hidden = true; if (popAnchor) popAnchor.setAttribute("aria-expanded", "false"); popAnchor = null; }
+function openPop(html, anchor){
+  if (popAnchor === anchor){ closePop(); return; }
+  closePop(); popAnchor = anchor; anchor.setAttribute("aria-expanded", "true");
+  pop.innerHTML = html; pop.hidden = false; place();
+}
+function place(){
+  const anchor = popAnchor; if (!anchor) return;
+  const r = anchor.getBoundingClientRect(), pw = pop.offsetWidth, ph = pop.offsetHeight, cx = r.left + r.width / 2;
+  const left = Math.min(Math.max(16, cx - pw / 2), innerWidth - pw - 16);
+  const above = r.top - ph - 13 >= 8;
+  pop.classList.toggle("below", !above);
+  pop.style.left = left + "px"; pop.style.top = (above ? r.top - ph - 13 : r.bottom + 13) + "px";
+  pop.style.setProperty("--ax", Math.min(Math.max(14, cx - left), pw - 14) + "px");
+}
+document.addEventListener("click", e => { if (!pop.hidden && !pop.contains(e.target) && !e.target.closest("[data-pop]")) closePop(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
+addEventListener("scroll", () => { if (!pop.hidden) place(); }, true);
+addEventListener("resize", () => { if (!pop.hidden) place(); });
+const rows = pairs => `<dl class="rows">${pairs.filter(Boolean).map(([k,v]) => `<div><dt>${esc(k)}</dt><dd>${v}</dd></div>`).join("")}</dl>`;
+
+/* ---------- desk ---------- */
+let mode = "int", shown = [], stage = 0, tab = "matrix", tampered = null;
+function facts(){
+  const m = D.meta, cur = D.clauses.filter(c => c.status === "frozen").length;
+  $("#facts").innerHTML = [["机构","BANK-X（仿真）"],["产品","示例卡"],["标准",`${cur} 个冻结条款版本`],["规则版本",esc(m.rule_version)],["审计链",`<span class="ok">✓ 校验通过</span> · ${m.audit_events} 条事件`]]
+    .map(([k,v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+}
+function starters(){
+  $("#starters").innerHTML = D.turns.map((t,i) => `<button class="starter ${shown.includes(i) ? "used" : ""}" data-turn="${i}"><span>${esc(Q(t))}</span><small>${esc(SCEN[t.verdict] || t.verdict)}</small></button>`).join("");
+  $("#starters").querySelectorAll("[data-turn]").forEach(b => b.onclick = () => ask(+b.dataset.turn));
+}
+function claimSpans(text, nums){
+  const out = [];
+  for (const n of nums || []){ const re = new RegExp(`${String(n).replace(/\.0+$/, "")}\\s*(?:元|笔|天|%|个月)?`, "g"); let m;
+    while ((m = re.exec(text))) out.push([m.index, m.index + m[0].length]); }
+  return out.sort((a,b)=>a[0]-b[0]).filter((s,i,a)=> i===0 || s[0] >= a[i-1][1]);
+}
+function inlineChip(t, i){
+  if (t.verdict === "通过") return `<button class="chip ok" data-pop="v" data-i="${i}" aria-expanded="false">${esc(t.source_ref || t.clause)}</button>`;
+  if (/^C[1-4]$/.test(t.verdict)) return `<button class="chip bad" data-pop="v" data-i="${i}" aria-expanded="false">${esc(t.verdict)} · ${esc(VNAME[t.verdict])}</button>`;
+  return `<button class="chip grey" data-pop="v" data-i="${i}" aria-expanded="false">${esc(t.verdict)}</button>`;
+}
+function withChip(text, spans, cls, chip){
+  if (!spans.length) return esc(text) + " " + chip;
+  let out = "", i = 0;
+  spans.forEach(([s, e], k) => { out += esc(text.slice(i, s)) + `<span class="${cls}">${esc(text.slice(s, e))}</span>` + (k === 0 ? chip : ""); i = e; });
+  return out + esc(text.slice(i));
+}
+function botInternal(t, i){
+  const cls = VCLS(t.verdict), spans = claimSpans(t.answer, t.claims);
+  const pill = t.verdict === "通过" ? `<span class="pill ok">已核对 · 一致</span>` : (cls === "bad" ? `<span class="pill bad">不一致 · ${esc(t.verdict)}</span>` : `<span class="pill grey">${esc(t.verdict)}</span>`);
+  const up = t.upcoming && stage >= 1 && t.verdict === "通过" ? ` <button class="chip warn" data-pop="v" data-i="${i}" aria-expanded="false">12-01 起将失效</button>` : "";
+  const body = t.claims.length ? withChip(t.answer, spans, cls === "ok" ? "claim-ok" : "claim-bad", inlineChip(t, i)) : esc(t.answer) + " " + inlineChip(t, i);
+  return `<div class="evbar">${pill}<button class="link" data-pop="v" data-i="${i}" aria-expanded="false">依据 · Clause</button>${t.card ? `<button class="link" data-card="${esc(t.card)}">证据卡 · Evidence</button>` : ""}<span class="mono" style="color:var(--faint)">${esc(t.obs_id)} · ${esc(t.region)} · ${esc(t.channel)}</span></div>
+    <span class="label">被测智能客服（BANK-X 仿真）</span><p class="answer">${body}${up}</p>`;
+}
+function botExternal(t, i){
+  const e = t.external;
+  if (e.action === "show"){ const c = e.citations[0];
+    return `<div class="evbar"><span class="pill ok">已核对</span><button class="link" data-pop="c" data-i="${i}">出处 · Source</button></div>
+      <span class="label">BANK-X 智能客服</span><p class="answer">${withChip(e.text, e.spans, "claim-ok", `<button class="chip ok" data-pop="c" data-i="${i}" aria-expanded="false">${esc(c.document)}</button>`)}</p>`; }
+  if (e.action === "handoff") return `<span class="label">BANK-X 智能客服</span><div class="handoff"><p class="eyebrow" style="color:var(--warn)">已转人工 · Human handoff</p><p>${esc(e.text)}</p></div>`;
+  return `<span class="label">BANK-X 智能客服</span><p class="answer">${esc(e.text)} <span class="chip grey">未核对，不附出处</span></p>`;
+}
+function renderMessages(){
+  const box = $("#messages");
+  box.innerHTML = shown.map(i => { const t = D.turns[i];
+    return `<article class="msg msg--user"><span class="label">客户 · ${esc(t.region)} · ${esc(t.channel)}</span>${esc(Q(t))}</article>
+      <article class="msg msg--bot">${mode === "int" ? botInternal(t, i) : botExternal(t, i)}</article>`; }).join("") || `<div class="empty"><span>▤</span>从左侧选一个情景，或直接提问。每条回答后的方块标记都能点开，看它依据哪一版制度。</div>`;
+  closePop();
+  box.querySelectorAll('[data-pop="v"]').forEach(b => b.onclick = ev => { openPop(verdictPop(D.turns[+b.dataset.i]), b); bindPop(); ev.stopPropagation(); });
+  box.querySelectorAll('[data-pop="c"]').forEach(b => b.onclick = ev => { openPop(citePop(D.turns[+b.dataset.i]), b); ev.stopPropagation(); });
+  box.querySelectorAll("[data-card]").forEach(b => b.onclick = () => gotoCard(b.dataset.card));
+  starters();
+}
+const toBottom = () => { const m = $("#messages"); m.scrollTo({top: m.scrollHeight, behavior: "smooth"}); };
+function ask(i){ shown = shown.filter(x => x !== i).concat(i); renderMessages(); toBottom(); }
+function verdictPop(t){
+  return `<h3>${t.verdict === "通过" ? "依据核对 · 一致" : "依据核对 · " + esc(t.verdict) + " " + esc(VNAME[t.verdict] || "")}</h3>` + rows([
+    ["判定", `${esc(t.verdict)}${t.grade ? " · 风险 " + esc(t.grade) : ""}`], ["AI 说", esc(t.answer)],
+    ["现行标准", t.expected != null ? `${esc(t.expected)} · ${esc(t.clause)}` : "—"], ["出处", esc(t.source_ref || "—")],
+    ["机器建议", `${esc(t.machine)}（仅建议）`], ["人工复核", t.reviewers.map(esc).join("<br>") || "—"],
+    ["规则版本", esc(D.meta.rule_version)], ["回答哈希", `<span class="mono">${esc(t.sha.slice(0,16))}…</span>`],
+    t.upcoming && stage >= 1 ? ["生效前预演", `${esc(t.upcoming.on)} 起：<b>${esc(t.upcoming.verdict)}</b>`] : null,
+  ]) + `<p class="quote">“${esc(t.reason)}”</p>` + (t.card ? `<button class="link" data-card="${esc(t.card)}">打开证据卡 ↗</button>` : "");
+}
+function citePop(t){ const c = t.external.citations[0];
+  return `<h3>这句话的出处</h3>` + rows([["文件", esc(c.document)], ["版本", esc(c.version)], ["生效日", esc(c.effective_from)], ["核对", esc(c.checked_by)]]) + `<p class="quote">“${esc(c.statement)}”</p>`; }
+function bindPop(){ pop.querySelectorAll("[data-card]").forEach(b => b.onclick = () => { closePop(); gotoCard(b.dataset.card); }); }
+const KEYS = [[/免.*年费|年费.*免/, "Q001"], [/年费/, "Q008"], [/逾期|还款|宽限/, "Q015"], [/理财|保本|亏/, "Q092"]];
+$("#composer").onsubmit = e => {
+  e.preventDefault(); const v = $("#draft").value.trim(); if (!v) return; $("#draft").value = ""; $("#send").disabled = true;
+  const hit = KEYS.find(([re]) => re.test(v));
+  if (hit){ const idx = D.turns.map((t,i)=>[t,i]).filter(([t]) => t.question_id === hit[1]).map(([,i])=>i); const next = idx.find(i => !shown.includes(i)); ask(next ?? idx[0]); }
+  else $("#messages").insertAdjacentHTML("beforeend", `<article class="msg msg--user"><span class="label">客户</span>${esc(v)}</article><article class="msg msg--bot"><span class="label">演示</span>这是固定的仿真演示，只认得年费、免年费、还款宽限和理财保本这几类问题。请从左侧选择情景。</article>`); toBottom();
+};
+$("#draft").oninput = () => { $("#send").disabled = !$("#draft").value.trim(); };
+$("#draft").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing){ e.preventDefault(); $("#composer").requestSubmit(); } };
+function setMode(m){ mode = m; $("#mode-int").setAttribute("aria-pressed", m === "int"); $("#mode-ext").setAttribute("aria-pressed", m === "ext"); renderMessages(); }
+$("#mode-int").onclick = () => setMode("int"); $("#mode-ext").onclick = () => setMode("ext");
+$("#reset").onclick = () => { shown = []; show("desk"); };
+
+/* ---------- console ---------- */
+function kpis(){
+  const d = D.meta.dist, err = ["C1","C2","C3","C4"].reduce((a,k)=>a+(d[k]||0),0);
+  $("#kpis").innerHTML = `<div class="kpi"><b>${D.meta.observations}</b><span>观察（只追加）</span></div><div class="kpi ok"><b>${d["通过"]||0}</b><span>首轮通过</span></div>
+    <div class="kpi bad"><b>${err}</b><span>确认差异</span></div><div class="kpi"><b>${D.chain.length}</b><span>证据卡</span></div><div class="kpi ok"><b>✓</b><span>审计链 ${D.meta.audit_events} 条</span></div>`;
+}
+const stepper = () => `<div class="steps">${D.stages.map((s,i)=>`<button class="btn" data-stage="${i}" aria-pressed="${i===stage}">${esc(s.label)}</button>`).join("")}</div>`;
+function tMatrix(){
+  const s = D.stages[stage], prev = stage ? D.stages[stage-1] : null, key = r => r.topic + "|" + r.region;
+  const pm = prev ? Object.fromEntries(prev.rows.map(r => [key(r), r])) : {};
+  return `<p class="eyebrow">分类分级放行</p><h2>放行矩阵</h2><p class="lead">只计人工判定；比率取 Wilson 95% 区间下界；样本不足、未关闭高危发现、标准变更未复测、结果过期只会降级。阈值为示例值。</p>${stepper()}<p class="note">${esc(s.note)}</p>
+    <div class="scroll"><table><thead><tr><th>主题</th><th>地区</th><th>n</th><th>错</th><th>正确率下界</th><th>等级</th><th>说明</th></tr></thead><tbody>
+    ${s.rows.map(r => { const p = pm[key(r)], ch = p && (p.level !== r.level || p.reasons.join() !== r.reasons.join());
+      return `<tr><td>${esc(r.topic)}</td><td>${esc(r.region)}</td><td>${r.n}${p && p.n !== r.n ? ` <span class="note">（原 ${p.n}）</span>` : ""}</td><td>${r.k}</td><td>${(r.lower_bound*100).toFixed(1)}%</td>
+      <td><span class="lv ${r.level} ${ch ? "changed" : ""}">${r.level}</span> ${esc(r.label)}</td><td>${esc(r.reasons.join("；") || "—")}</td></tr>`; }).join("")}</tbody></table></div>`;
+}
+function tObs(){
+  const list = D.observations.filter(o => o.final !== "通过").concat(D.observations.filter(o => o.final === "通过").slice(0, 6));
+  return `<p class="eyebrow">观察与人工复核</p><h2>${D.meta.observations} 条观察，机器只给建议</h2><p class="lead">两名复核人一致才计入统计，分歧记为待人工。列出全部差异与前 6 条通过记录。</p>
+    <div class="scroll"><table><thead><tr><th>编号</th><th>时间</th><th>主题</th><th>地区</th><th>回答</th><th>机器建议</th><th>人工判定</th><th>复核人</th></tr></thead><tbody>
+    ${list.map(o => `<tr><td class="mono">${esc(o.obs_id)}</td><td>${esc(o.ts)}</td><td>${esc(o.topic)}</td><td>${esc(o.region)}</td><td>${esc(o.answer)}</td><td><span class="chip ${VCLS(o.machine)}">${esc(o.machine)}</span></td><td><span class="chip ${VCLS(o.final)}">${esc(o.final)}</span></td><td>${o.reviewers}</td></tr>`).join("")}</tbody></table></div>`;
+}
+function tStd(){
+  return `<p class="eyebrow">制度基准</p><h2>冻结的标准：只增不改</h2><p class="lead">条款经确认后冻结，数据库触发器拒绝修改；要变只能新增版本。</p>
+    <div class="scroll"><table><thead><tr><th>条款版本</th><th>主题</th><th>取值</th><th>生效日</th><th>出处</th><th>状态</th></tr></thead><tbody>
+    ${D.clauses.map(c => `<tr><td class="mono">${esc(c.ref)}</td><td>${esc(c.topic)}</td><td>${esc(c.facts.join("、"))}</td><td>${esc(c.effective_from)}</td><td>${esc(c.source_ref)}</td><td>${c.status === "frozen" ? "已冻结" : esc(c.status)}</td></tr>`).join("")}</tbody></table></div>
+    <p style="margin-top:1rem"><button class="btn btn--danger" id="try-edit">尝试修改 ANNUAL-FEE-R1@v2</button></p><div id="edit-res"></div>`;
+}
+function tRegress(){
+  if (stage === 0) return `<p class="eyebrow">生效前回归</p><h2>目前没有待生效的新标准</h2><p class="lead">点“② 发布新标准”，看答信怎样在生效前找出会出错的回答。</p>${stepper()}`;
+  return D.plans.map(p => `<p class="eyebrow">生效前回归 · 机器预演，不计入统计</p><h2>${esc(p.clause)}（${esc(p.topic)}）${esc(p.effective_from)} 生效</h2>
+    <p class="lead">须在 <b>${esc(p.deadline)}</b> 前复测（剩 ${p.days_left} 天）。须复测的问题 ${p.questions.length} 个；已记录的 ${p.recorded_answers} 条回答按新标准预演：${Object.entries(p.preview_summary).map(([k,v]) => `<span class="chip ${VCLS(k)}">${esc(k)} ${v}</span>`).join(" ")}</p>${stepper()}
+    <div class="scroll"><table><thead><tr><th>编号</th><th>回答</th><th>预演</th><th>理由</th></tr></thead><tbody>
+    ${p.preview.slice(0,5).map(x => `<tr><td class="mono">${esc(x.obs_id)}</td><td>${esc(x.answer)}</td><td><span class="chip ${VCLS(x.verdict)}">${esc(x.verdict)}</span></td><td>${esc(x.reason)}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note">如果知识库没在 ${esc(p.effective_from)} 前更新，这些回答在生效当天就会变成引用旧版。</p>`).join("");
+}
+const MODE_CN = {auto:"全自动", ai_draft_human_confirm:"AI 起草，人工确认", ai_answer_offer_handoff:"AI 回答并提示可转人工", human_only:"转人工"};
+function decide(doc, topic, region){ const h = doc.routes.filter(r => r.topic === topic && (r.region === "" || r.region === region));
+  return h.length ? {level: h[0].level, mode: h[0].mode, why: h[0].reasons.join("；") || h[0].label} : {...doc.default, why: "未经验收的范围，按默认处理"}; }
+function tRouting(){
+  const doc = D.stages[stage].routing, opts = [...new Set(doc.routes.map(r => r.topic + "|" + r.region))];
+  return `<p class="eyebrow">路由策略</p><h2>放行矩阵 → 智能客服的路由</h2><p class="lead">答信不进入回答生成，只发布每个范围的放行决定。未列出的范围默认 L4 人工，过期按 L3，文件带 SHA-256，被改动即拒用。</p>${stepper()}
+    <div class="two"><div><div class="scroll"><table><thead><tr><th>主题</th><th>地区</th><th>等级</th><th>路由</th><th>有效至</th></tr></thead><tbody>
+    ${doc.routes.map(r => `<tr><td>${esc(r.topic)}</td><td>${esc(r.region)}</td><td><span class="lv ${r.level}">${r.level}</span></td><td>${esc(MODE_CN[r.mode])}</td><td>${esc(r.valid_until)}</td></tr>`).join("")}</tbody></table></div>
+    <p class="note" style="margin-top:1rem"><label for="rt">模拟一个进线问题：</label><select id="rt">${opts.map(t => `<option>${esc(t)}</option>`).join("")}<option>信用卡分期手续费|R1</option></select></p><div id="rt-out" class="card"></div></div>
+    <div><p class="note">routing.json · ${esc(doc.schema)} · sha256 <span class="mono">${esc(doc.sha256.slice(0,16))}…</span></p><pre>${esc(JSON.stringify({...doc, routes: doc.routes.slice(0,2), "…": `共 ${doc.routes.length} 条`}, null, 1))}</pre></div></div>`;
+}
+async function sha256(s){ const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(s)); return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2,"0")).join(""); }
+const tamperText = a => a.replace(/\d+/, m => String(+m + 50));
+function tChain(){
+  return `<p class="eyebrow">证据卡 · 链式校验</p><h2>${D.chain.length} 张证据卡，一张接一张</h2><p class="lead">每张卡的校验值包含上一张。改动任何一张卡的任何一个字，它和之后的每一张都会校验失败。校验在你的浏览器里实时计算。</p>
+    <p><button class="btn btn--danger" id="tamper">${tampered ? "撤销篡改" : "试着把第一张卡的回答改一个数字"}</button></p><div class="cards" id="chain"></div>`;
+}
+async function fillChain(){
+  let prev = "0".repeat(64); const ok = [];
+  for (const c of D.chain){ const canon = tampered === c.id ? c.canon.replace(c.answer, tamperText(c.answer)) : c.canon; const h = await sha256(prev + canon); ok.push(h === c.hash); prev = h; }
+  $("#chain").innerHTML = D.chain.map((c,i) => `<div class="card ${ok[i] ? "" : "bad"}" id="card-${esc(c.id)}"><span class="st ${ok[i] ? "ok" : "bad"}">${ok[i] ? "✓ 校验通过" : "✗ 校验失败"}</span>
+    <b>${esc(c.id)}</b> <span class="chip ${VCLS(c.verdict)}">${esc(c.verdict)} · ${esc(VNAME[c.verdict]||"")}</span> 风险 ${esc(c.grade||"—")}
+    ${rows([["回答", esc(tampered === c.id ? tamperText(c.answer) + "（已被篡改）" : c.answer)], ["依据", esc((c.clause || "—") + "；" + c.reason)], ["复核人", esc(c.reviewers.join("、"))], ["规则版本", esc(c.rule_version)], ["校验值", `<span class="mono">${esc(c.hash.slice(0,32))}…</span>`]])}</div>`).join("");
+}
+const TABS = [["matrix","放行矩阵",tMatrix],["regress","生效前回归",tRegress],["routing","路由策略",tRouting],["chain","证据链",tChain],["obs","观察与复核",tObs],["std","制度基准",tStd]];
+function renderConsole(){
+  $("#tabs").innerHTML = TABS.map(([k,n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${k===tab}">${n}</button>`).join("");
+  $("#tabs").querySelectorAll(".tab").forEach(b => b.onclick = () => { tab = b.dataset.tab; renderConsole(); });
+  const p = $("#pane"); p.innerHTML = TABS.find(t => t[0] === tab)[2]();
+  p.querySelectorAll("[data-stage]").forEach(b => b.onclick = () => { stage = +b.dataset.stage; renderConsole(); });
+  if (tab === "chain"){ fillChain(); $("#tamper").onclick = () => { tampered = tampered ? null : D.chain[0].id; renderConsole(); }; }
+  if (tab === "std") $("#try-edit").onclick = () => { $("#edit-res").innerHTML = `<div class="toast">数据库拒绝：<span class="mono">${esc(D.meta.frozen_error)}</span>。这是生成本页的演示运行中，对已冻结条款执行 UPDATE 时触发器返回的原始信息。</div>`; };
+  if (tab === "routing"){ const doc = D.stages[stage].routing, sel = $("#rt");
+    const f = () => { const [t, r] = sel.value.split("|"), d = decide(doc, t, r); $("#rt-out").innerHTML = `<b>${esc(t)} · ${esc(r)}</b> → <span class="lv ${d.level}">${d.level}</span> ${esc(MODE_CN[d.mode])}<div class="note">${esc(d.why)}</div>`; };
+    sel.onchange = f; f(); }
+}
+function gotoCard(id){ tab = "chain"; show("console"); setTimeout(() => { const el = document.getElementById("card-" + id); if (el){ el.scrollIntoView({block:"center"}); el.classList.add("changed"); } }, 150); }
+function show(v){
+  $("#view-desk").hidden = v !== "desk"; $("#view-console").hidden = v !== "console"; closePop();
+  $("#nav-desk").setAttribute("aria-pressed", v === "desk"); $("#nav-console").setAttribute("aria-pressed", v === "console");
+  if (v === "console") renderConsole(); else renderMessages();
+  try { if (location.hash !== "#" + v) history.replaceState(null, "", "#" + v); } catch (e) {}
+}
+$("#nav-desk").onclick = () => show("desk"); $("#nav-console").onclick = () => show("console");
+addEventListener("hashchange", () => show(location.hash === "#console" ? "console" : "desk"));
+facts(); kpis(); shown = [2, 3];
+show(location.hash === "#console" ? "console" : "desk");
+</script>
+</body>
+</html>

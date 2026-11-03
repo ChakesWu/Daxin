@@ -144,6 +144,69 @@ def evidence(out: Path, ws: Path = WS, public: bool = typer.Option(False, help="
     typer.echo(f"证据卡 {len(cards)} 张（链校验{'通过' if verify_cards(cards) else '失败'}）→ {out}")
 
 
+def _inst(st: Store) -> str:
+    insts = sorted({o.inst for o in st.observations() if o.inst})
+    return insts[0] if len(insts) == 1 else ",".join(insts)
+
+
+@app.command("route-export")
+def route_export(out: Path, ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD"),
+                 by: str = typer.Option("topic,region,channel,language", help="分组维度，逗号分隔"),
+                 max_age: int = typer.Option(30, help="放行有效天数，过期后路由须按 L3 处理")):
+    """把放行矩阵导出为路由策略 JSON，供智能客服的意图路由读取（未列出的范围默认 L4 人工）。"""
+    from .routing import build as route_build
+    _, a, pol, st = _ctx(ws)
+    rows = matrix(pol, st, today=date.fromisoformat(today) if today else None, max_age_days=max_age,
+                  group=tuple(x.strip() for x in by.split(",") if x.strip()))
+    doc = route_build(rows, _inst(st), [c.ref for c in pol.clauses(("frozen",))], a.head(), max_age)
+    a.append(actor(), "routing.export", "routing", doc["sha256"], {"routes": len(doc["routes"]), "out": str(out)})
+    Path(out).parent.mkdir(parents=True, exist_ok=True); Path(out).write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
+    typer.echo(f"路由策略 {len(doc['routes'])} 条范围 → {out}（sha256 {doc['sha256'][:12]}…）")
+
+
+@app.command("route-check")
+def route_check(file: Path, topic: str, region: str = "", channel: str = "", language: str = "",
+                today: str = typer.Option("", help="YYYY-MM-DD，用于判断是否过期")):
+    """按路由策略文件查询一个问题应走哪种模式（参考实现，供路由方对照）。"""
+    from .routing import decide
+    d = decide(json.loads(Path(file).read_text(encoding="utf-8")), topic, region, channel, language,
+               date.fromisoformat(today) if today else None)
+    typer.echo(f"{d['level']} {d['mode']}：{d['why']}")
+
+
+@app.command()
+def regress(ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD，默认今天"), out: Path = typer.Option(None, help="另存 JSON")):
+    """制度生效前回归：列出待生效条款须复测的问题，并按新标准预演已记录的回答（机器预演，不计入统计）。"""
+    from .regress import plan, text
+    _, _, pol, st = _ctx(ws); ps = plan(pol, st, date.fromisoformat(today) if today else date.today())
+    typer.echo(text(ps))
+    if out:
+        Path(out).write_text(json.dumps(ps, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+@app.command()
+def report(out: Path, ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD"), period: str = typer.Option("", help="测评期间"),
+           by: str = typer.Option("topic,region,channel,language", help="分组维度")):
+    """生成测评报告范本（Markdown），各节标注对应的金发〔2026〕8号条款。"""
+    from .report import build as report_build
+    _, a, pol, st = _ctx(ws); d = date.fromisoformat(today) if today else date.today()
+    rows = matrix(pol, st, today=d, group=tuple(x.strip() for x in by.split(",") if x.strip()))
+    days = sorted(o.day for o in st.observations())
+    text = report_build(pol, st, a, rows, _inst(st), period or (f"{days[0]} 至 {days[-1]}" if days else "—"), d)
+    Path(out).parent.mkdir(parents=True, exist_ok=True); Path(out).write_text(text, encoding="utf-8")
+    typer.echo(f"报告范本 → {out}")
+
+
+@app.command("export-demo")
+def export_demo(out: Path = typer.Option(Path("site/index.html"), help="输出的单文件网页"),
+                dir: Path = typer.Option(Path(".daxin-demo"), help="演示工作区（会被清空）")):
+    """运行仿真演示，并把结果导出为可离线打开的网页（外部客户视角 + 内部验收视角）。"""
+    import shutil
+    from .webdemo import export
+    shutil.rmtree(dir, ignore_errors=True)
+    path = export(dir, out); typer.echo(f"网页 → {path}")
+
+
 @app.command("audit-verify")
 def audit_verify(ws: Path = WS):
     ok, bad = _ctx(ws)[1].verify(); typer.echo("审计链通过" if ok else f"审计链第 {bad} 条异常"); raise typer.Exit(0 if ok else 1)

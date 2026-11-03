@@ -1,6 +1,7 @@
 """Claim extraction (layers L1 and L2 of the architecture): deterministic rules and lexicons. No model is involved.
 
-Limits (see docs): digits and Chinese numerals up to 999, common units, percentages; ordinals, fractions and multi-condition
+Limits (see docs): digits, Chinese numerals up to 999, English and Portuguese number words up to 999 (language packs in
+lang.py: zh-Hans, zh-Hant, en, pt), common units, percentages; ordinals, fractions and multi-condition
 sentences are not understood. When nothing can be extracted the caller must treat the answer as 'pending human', never as a pass.
 """
 from __future__ import annotations
@@ -9,20 +10,28 @@ import re
 
 _D = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "兩": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
 NUM = r"(?:\d+(?:\.\d+)?|[零〇一二两兩三四五六七八九十百]+)"
-_UNITS = {
-    "笔": r"(?:笔|筆|次|宗|purchases?|transactions?|times|compras?)",
-    "天": r"(?:天|日|个工作日|個工作日|工作日|days?|dias?)",
-    "元": r"(?:元|块|圆|港元|人民币|HKD|RMB|CNY|yuan|dollars?)",
-    "%": r"(?:%|％|个百分点|percent)",
-    "月": r"(?:个月|個月|月|months?|meses)",
-    "年": r"(?:年|years?|anos?)",
-}
-_LEAD = {"元": r"(?:¥|￥|HK\$|HKD|RMB|CNY|R\$)\s*", "%": r"百分之\s*"}
+from . import lang as L
 
-PROMISE = re.compile(r"保证|一定(?:能|会|可以|不会)|绝对|絕對|肯定(?:能|会)|无风险|零风险|稳赚|保本保收益|已为您(?:批准|通过)|"
-                     r"guarantee[ds]?|risk[- ]free|definitely will|garanti[ad]", re.I)
-HANDOFF = re.compile(r"转人工|轉人工|人工(?:客服|服务|坐席|座席)|客服(?:热线|熱線|电话)|联系(?:客户经理|网点)|柜台|櫃檯|拨打|撥打|"
-                     r"human agent|speak (?:to|with) (?:a|an) (?:agent|representative)|customer service (?:hotline|line)|atendente|falar com", re.I)
+
+def _word_number(tok: str, words: dict[str, int]) -> float | None:
+    """'twelve' -> 12, 'twenty one' / 'twenty-one' -> 21, 'two hundred' -> 200, 'cento e vinte' -> 120, 'doze' -> 12."""
+    parts = [p for p in re.split(r"[\s-]+", tok.lower()) if p and p not in ("e", "and")]
+    if not parts:
+        return None
+    cur = 0
+    for p in parts:
+        if p == "hundred":
+            cur = (cur or 1) * 100
+        elif p in words:
+            cur += words[p]
+        else:
+            return None
+    return float(cur)
+
+
+def _word_num_re(words: dict[str, int]) -> str:
+    w = "|".join(sorted(map(re.escape, list(words) + ["hundred"]), key=len, reverse=True))
+    return rf"(?:(?:{w})(?:(?:\s+(?:e|and)\s+|[\s-]+)(?:{w}))*)"
 
 
 def cn_to_number(s: str) -> float | None:
@@ -40,31 +49,55 @@ def cn_to_number(s: str) -> float | None:
     return float(total + cur) if (seen_unit or len(s) == 1) else None
 
 
-def _num(tok: str) -> float | None:
-    return float(tok) if tok[0].isdigit() else cn_to_number(tok)
+def _num(tok: str, words: dict[str, int] | None = None) -> float | None:
+    if tok[0].isdigit():
+        return float(tok)
+    v = cn_to_number(tok)
+    return v if v is not None or not words else _word_number(tok, words)
 
 
-def claim_values(text: str, unit: str = "") -> list[float]:
-    """Numbers the answer states, tied to `unit` when the unit is known (so '3 days' is not read as a count of purchases)."""
+def claim_spans(text: str, unit: str = "", lang: str = "") -> list[tuple[int, int, float]]:
+    """(start, end, value) of each number the answer states with `unit`, read with the answer's language pack."""
     text = text or ""
-    if unit in _UNITS:
-        pats = [rf"({NUM})\s*(?:个|個)?\s*{_UNITS[unit]}"]
-        if unit in _LEAD:
-            pats.append(rf"{_LEAD[unit]}({NUM})")
-        hits = [(m.start(), m.group(1)) for p in pats for m in re.finditer(p, text, re.I)]
+    words = L.number_words(lang)
+    num = rf"(?:{NUM}|\b{_word_num_re(words)}\b)" if words else NUM
+    if unit:
+        u = L.unit_re(unit, lang)
+        if not u:
+            return []
+        m_ = L.measure_re(lang)
+        pats = [rf"({num})\s*(?:(?:{m_})\s*)?(?:{u})" if m_ else rf"({num})\s*(?:{u})"]
+        lead = L.lead_re(unit, lang)
+        if lead:
+            pats.append(rf"(?:{lead})\s*({num})")
     else:
-        hits = [(m.start(), m.group(0)) for m in re.finditer(NUM, text)]
+        pats = [rf"({NUM})"]
+    hits = []
+    for p in pats:
+        for m in re.finditer(p, text, re.I):
+            v = _num(m.group(1), words)
+            if v is not None:
+                hits.append((m.start(), m.end(), v))
+    hits.sort()
+    out: list[tuple[int, int, float]] = []
+    for h in hits:
+        if not out or h[0] >= out[-1][1]:
+            out.append(h)
+    return out
+
+
+def claim_values(text: str, unit: str = "", lang: str = "") -> list[float]:
+    """Numbers the answer states, tied to `unit` when the unit is known (so '3 days' is not read as a count of purchases)."""
     out: list[float] = []
-    for _, tok in sorted(hits):
-        v = _num(tok)
-        if v is not None and v not in out:
+    for _, _, v in claim_spans(text, unit, lang):
+        if v not in out:
             out.append(v)
     return out
 
 
-def promises(text: str) -> bool:
-    return bool(PROMISE.search(text or ""))
+def promises(text: str, lang: str = "") -> bool:
+    return bool(L.lexicon("promise", lang).search(text or ""))
 
 
-def hands_off(text: str) -> bool:
-    return bool(HANDOFF.search(text or ""))
+def hands_off(text: str, lang: str = "") -> bool:
+    return bool(L.lexicon("handoff", lang).search(text or ""))
