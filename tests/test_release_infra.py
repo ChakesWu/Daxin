@@ -64,7 +64,7 @@ def test_report_template_uses_workspace_numbers_and_marks_what_to_align(env):
     _, a, pol, st = env
     clause(pol=pol); fill(env, 40, errors=2)
     text = report(pol, st, a, matrix(pol, st, group=("topic", "region")), "BANK-X", "2026-11", date(2026, 11, 20))
-    assert "| C1 | 2 |" in text and "| 通过 | 38 |" in text and ALIGN in text and "BANK-X" in text
+    assert "| C1 | 2 |" in text and "| 通过 | 38 |" in text and "金发〔2026〕8号" in text and "第十五条" in text and "BANK-X" in text
 
 
 def test_cli_route_regress_report(tmp_path):

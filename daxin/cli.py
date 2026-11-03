@@ -187,7 +187,7 @@ def regress(ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD，默�
 @app.command()
 def report(out: Path, ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD"), period: str = typer.Option("", help="测评期间"),
            by: str = typer.Option("topic,region,channel,language", help="分组维度")):
-    """生成测评报告范本（Markdown）。【待对齐】处须按正式监管文本补全。"""
+    """生成测评报告范本（Markdown），各节标注对应的金发〔2026〕8号条款。"""
     from .report import build as report_build
     _, a, pol, st = _ctx(ws); d = date.fromisoformat(today) if today else date.today()
     rows = matrix(pol, st, today=d, group=tuple(x.strip() for x in by.split(",") if x.strip()))
