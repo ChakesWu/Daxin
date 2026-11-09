@@ -100,6 +100,44 @@ def p_conflicts(ws: Path = WS):
     typer.echo(f"冲突 {len(cs)} 处")
 
 
+@policy_app.command("draft")
+def p_draft(doc: Path, ws: Path = WS, raw_dir: Path = typer.Option(None, help="保存模型原始输出（可离线重放）"),
+            replay: bool = typer.Option(False, help="只从 raw-dir 重放，不联网"), effective_from: str = typer.Option("", help="原文无日期时由人工指定"),
+            model: str = typer.Option("", help="默认 DAXIN_LLM_MODEL 或 glm-5.3-flashx"), effort: str = typer.Option("high")):
+    """用 LLM 从制度原文草拟事实。引文须逐字存在于原文且含该数字，否则拒收；结果只进草稿，须人工确认。"""
+    from .draft import draft_facts, to_clauses
+    from .llm import LLMClient, ReplayClient
+    _, _, pol, _ = _ctx(ws)
+    client = ReplayClient(raw_dir) if replay else LLMClient(model=model or None, record_dir=raw_dir, effort=effort)
+    res = draft_facts(doc.read_text(encoding="utf-8"), client)
+    cs = to_clauses(res, f"文档:{doc.name}", date.fromisoformat(effective_from) if effective_from else None)
+    for c in cs:
+        pol.add(c, "llm-draft")
+    typer.echo(f"草拟 {len(res.accepted)} 条通过核对，拒收 {len(res.rejected)} 条，写入草稿 {len(cs)} 条（均为未确认）；错误 {len(res.errors)}")
+    for r in res.rejected:
+        typer.echo(f"  拒收[{r.reason}] {r.raw.get('key', '')} {r.raw.get('value', '')}")
+    for f in res.accepted:
+        for w in f.warnings:
+            typer.echo(f"  待核[{f.key}={f.value}] {w}")
+
+
+@app.command()
+def questions(out: Path = typer.Option(None, help="写出 JSON"), day: str = "", ws: Path = WS):
+    """由已冻结的标准自动出题（基础题、易混边界题、改写题）。"""
+    from .questions import generate, summary
+    _, _, pol, _ = _ctx(ws); qs = generate(pol, date.fromisoformat(day) if day else None)
+    typer.echo(str(summary(qs)))
+    if out:
+        out.write_text(json.dumps([q.model_dump(mode="json") for q in qs], ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+@app.command()
+def coverage(ws: Path = WS):
+    """各主题的事实覆盖情况；有未测事实的主题放行封顶 L3（完全没测为 L4）。"""
+    from .coverage import markdown, report
+    _, _, pol, st = _ctx(ws); typer.echo(markdown(report(pol, st)))
+
+
 @app.command("observe-import")
 def observe_import(log: Path, bank: Path, ws: Path = WS):
     """从 test_log.xlsx 导入观察记录与人工判定。"""

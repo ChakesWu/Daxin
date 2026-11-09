@@ -9,6 +9,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 
+from .coverage import report as coverage_report
 from .grade import grade
 from .models import ERRORS, SCORED
 from .observe import Store
@@ -48,6 +49,7 @@ def matrix(policy: Policy, store: Store, today: date | None = None, max_age_days
         groups[tuple(getattr(o, g) for g in group)].append(o)
     total_scored = sum(1 for o in obs if final.get(o.obs_id) in SCORED) or 1
     judg = store.judgments()
+    cov = coverage_report(policy, store)
     rows = []
     for key, os_ in sorted(groups.items()):
         r = Row(**dict(zip(group, key)), **{g: "" for g in ("topic", "region", "channel", "language") if g not in group})
@@ -94,8 +96,17 @@ def matrix(policy: Policy, store: Store, today: date | None = None, max_age_days
             ceiling = lower(ceiling, "L3"); r.reasons.append("标准在最近一次测试之后有新版本生效，尚未复测，封顶 L3")
         if today and (today - last).days > max_age_days:
             ceiling = lower(ceiling, "L3"); r.reasons.append(f"最近一次测试已超过 {max_age_days} 天，放行已过期，封顶 L3")
+        cap = cov.get(r.topic).ceiling if cov.get(r.topic) else None
+        if cap:
+            ceiling = lower(ceiling, cap)
+            r.reasons.append(f"该主题有未测事实 {len(cov[r.topic].untested)} 项（{'、'.join(cov[r.topic].untested)}），覆盖不足，封顶 {cap}")
         r.level = lower(level, ceiling)
         if r.unreviewed:
             r.reasons.append(f"另有 {r.unreviewed} 条尚未经人工判定，不计入")
         rows.append(r)
+    if "topic" in group:      # a topic in the standard that nobody has tested at all is never released
+        seen = {row.topic for row in rows}
+        for t, c in sorted(cov.items()):
+            if t not in seen:
+                rows.append(Row(topic=t, region="", channel="", language="", level="L4", reasons=[f"该主题 {len(c.untested)} 项事实完全没有经人工判定的测试"]))
     return rows
