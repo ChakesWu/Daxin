@@ -19,7 +19,7 @@
 ```bash
 pip install -e ".[dev]"
 daxin demo --dir .daxin-demo        # 端到端演示（仿真）
-python -m pytest -q                 # 112 项测试
+python -m pytest -q                 # 116 项测试
 ```
 
 演示会依次展示：冻结的条款无法被改动；对 200 余条仿真回答判定；放行矩阵；一次标准变更使放行降级；复测后恢复；证据卡与审计链校验。
@@ -55,6 +55,8 @@ daxin evidence out/evidence_cards.md --public      # 对外导出：需要 priva
 daxin questions --out out/questions.json     # 冻结标准 → 基础题 / 易混边界题 / 改写题
 daxin coverage                               # 有未测事实的主题封顶 L3（完全没测 L4）
 daxin accuracy                               # 机器判定对人工复核的准确率、误放行率、kappa（均附区间）
+daxin ask q.json http://127.0.0.1:8801/ --run A1 --ws W   # HTTP 适配器（默认关闭，仅本机/授权主机，带节流）
+daxin review-export sheet.csv / review-import sheet.csv --by 甲   # 盲判表
 daxin policy draft 制度文件.txt --raw-dir raw --effective-from 2026-01-01   # LLM 草拟，引文逐字核对，只进草稿
 ```
 
@@ -64,6 +66,8 @@ LLM 经 OpenAI 兼容接口调用（默认 `glm-5.3-flashx`，可用 `DAXIN_LLM_
 **实测数字（仿真，单次）**：`testkit/draft_eval/` 里 1 份虚构制度文件、手写答案表 11 项（答案表由 Claude 编写，未经人工复核）。`glm-5.3-flashx`、effort=high 的一次运行：12 条通过核对、0 条拒收；
 严格匹配（单位和范围字符串须完全一致）命中 3/11，精确率 0.25、召回 0.27；宽松匹配（忽略“元/天”的周期后缀和“地区”后缀）命中 11/11。
 差距几乎全是**范围与单位的写法不统一**（如“R1 地区”对“R1”），说明草拟后必须把范围映射到受控词表再确认。样本只有 1 份文件、11 项、1 次运行，**不能据此推断真实准确率**；`python testkit/draft_eval/run_eval.py` 可离线重放复现。
+
+自建靶场（仿真 RAG 客服）与第一轮运行结果见 `testkit/range/`。
 
 测试必要性的依据与来源（含哪些没有文献支撑）见 `docs/依据与来源.md`。
 

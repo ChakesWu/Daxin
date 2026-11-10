@@ -90,3 +90,64 @@ def test_cli_review_validates_and_freezes_are_enforced(tmp_path):
     assert runner.invoke(app, ["policy", "add", str(clauses), "--ws", str(ws)]).exit_code == 0
     r = runner.invoke(app, ["policy", "freeze", "GRACE-R1", "v1", "--ws", str(ws)])
     assert r.exit_code == 1 and "失败" in r.output                       # still a draft: it has to be confirmed first
+
+
+def test_http_adapter_is_closed_by_default_and_local_only(monkeypatch):
+    import pytest
+    from daxin.adapters.http import MIN_INTERVAL_S, AdapterRefused, HttpAdapter
+    monkeypatch.delenv("DAXIN_HTTP_ENABLED", raising=False)
+    with pytest.raises(AdapterRefused):
+        HttpAdapter("http://127.0.0.1:8000/chat")
+    monkeypatch.setenv("DAXIN_HTTP_ENABLED", "1")
+    with pytest.raises(AdapterRefused):
+        HttpAdapter("https://example.com/chat")                                     # remote host: refused
+    with pytest.raises(AdapterRefused):
+        HttpAdapter("https://example.com/chat", authorized_host="example.com")      # flag alone is not enough
+    monkeypatch.setenv("DAXIN_HTTP_AUTHORIZED", "example.com")
+    assert HttpAdapter("https://example.com/chat", authorized_host="example.com")
+    assert HttpAdapter("http://localhost:1/chat", interval_s=0.0).interval_s == MIN_INTERVAL_S     # the throttle cannot be turned off
+
+
+def test_http_adapter_records_failure_as_no_answer(monkeypatch):
+    from daxin.adapters.http import HttpAdapter
+    monkeypatch.setenv("DAXIN_HTTP_ENABLED", "1")
+    ans, meta = HttpAdapter("http://127.0.0.1:9/chat", timeout_s=1).ask("q")          # nothing listens on port 9
+    assert ans == "" and "error" in meta
+
+
+def test_cli_ask_review_export_is_blind(tmp_path, monkeypatch):
+    import csv, json, threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers["Content-Length"]))
+            data = json.dumps({"answer": "每年刷满 6 笔免年费", "system": {"gen_model": "fake"}}).encode()
+            self.send_response(200); self.send_header("Content-Length", str(len(data))); self.end_headers(); self.wfile.write(data)
+
+        def log_message(self, *a):
+            pass
+
+    srv = HTTPServer(("127.0.0.1", 0), H); threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setenv("DAXIN_HTTP_ENABLED", "1")
+    qs = tmp_path / "q.json"
+    qs.write_text(json.dumps([{"qid": "G-1", "kind": "basic", "fact_key": "fee_waiver.min_purchases", "topic": "年费免除", "text": "年费怎么免？",
+                               "scope": {"region": "R1", "product": "示例卡", "channel": None, "language": None}}]), encoding="utf-8")
+    ws, meta = tmp_path / "w", tmp_path / "meta.json"
+    r = runner.invoke(app, ["ask", str(qs), f"http://127.0.0.1:{srv.server_port}/", "--run", "A1", "--ws", str(ws), "--meta-out", str(meta)])
+    srv.shutdown()
+    assert r.exit_code == 0 and "已问 1 题，无回答 0 题" in r.output and json.loads(meta.read_text())["system"]["gen_model"] == "fake"
+    sheet = tmp_path / "s.csv"
+    assert runner.invoke(app, ["review-export", str(sheet), "--ws", str(ws)]).exit_code == 0
+    rows = list(csv.DictReader(open(sheet, encoding="utf-8-sig")))
+    assert list(rows[0]) == ["obs_id", "question", "answer", "verdict", "note"]          # no machine verdict, no run configuration
+    rows[0]["verdict"] = "通过"
+    with open(sheet, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=list(rows[0])); w.writeheader(); w.writerows(rows)
+    assert "导入 1 条复核" in runner.invoke(app, ["review-import", str(sheet), "--by", "甲", "--ws", str(ws)]).output
+
+
+def test_cli_ask_refuses_when_adapter_is_off(tmp_path, monkeypatch):
+    monkeypatch.delenv("DAXIN_HTTP_ENABLED", raising=False)
+    q = tmp_path / "q.json"; q.write_text("[]")
+    assert runner.invoke(app, ["ask", str(q), "http://127.0.0.1:1/", "--run", "A1", "--ws", str(tmp_path / "w")]).exit_code == 2

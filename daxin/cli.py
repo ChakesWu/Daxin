@@ -149,6 +149,68 @@ def accuracy(ws: Path = WS, rule_version: str = typer.Option("", help="只看某
     _, _, _, st = _ctx(ws); typer.echo(markdown(from_store(st, rule_version or None)))
 
 
+@app.command()
+def ask(questions: Path, url: str, run: str = typer.Option(..., help="本轮编号；用不透明的代号（如 A1），不要写出被测配置，免得盲判时泄露"),
+        day: str = typer.Option("", help="提问日期 YYYY-MM-DD，默认今天（判定按该日的现行标准）"), limit: int = typer.Option(0, help="只问前 N 题，0 为全部"),
+        interval: float = typer.Option(1.0, help="两次请求的最小间隔秒数；下限 0.5，不可再低"), timeout: float = typer.Option(60.0),
+        authorized_host: str = typer.Option("", help="非本机主机须在此写明，并列入环境变量 DAXIN_HTTP_AUTHORIZED"),
+        meta_out: Path = typer.Option(None, help="把被测系统指纹等元数据写到此 JSON（不要和盲判表一起给复核人）"), ws: Path = WS):
+    """用 HTTP 适配器把自动出的题问给被测系统，回答存为观察。仅限授权测试环境；默认关闭（需 DAXIN_HTTP_ENABLED=1）；无回答记为“无回答”。"""
+    import time as _t
+    from .adapters.http import AdapterRefused, HttpAdapter
+    from .models import Observation
+    try:
+        ad = HttpAdapter(url, interval, timeout, authorized_host)
+    except AdapterRefused as e:
+        typer.echo(str(e)); raise typer.Exit(2)
+    _, _, _, st = _ctx(ws)
+    qs = json.loads(questions.read_text(encoding="utf-8"))
+    qs = qs[:limit] if limit else qs
+    d = day or date.today().isoformat(); n_no = 0; systems = []
+    for q in qs:
+        ans, meta = ad.ask(q["text"])
+        n_no += not ans
+        if meta.get("system"):
+            systems.append(meta["system"])
+        sc = q["scope"]
+        st.add(Observation(obs_id=f"{run}-{q['qid']}", ts=f"{d} {_t.strftime('%H:%M')}", inst="BANK-X", region=sc.get("region") or "", product=sc.get("product") or "",
+                           channel=sc.get("channel") or "官网", language="zh-Hans", question_id=q["qid"], session=run, retest_group=run, question=q["text"],
+                           answer=ans, fact_key=q["fact_key"], topic=q["topic"], recorder="http-adapter"), actor())
+    info = {"run": run, "asked": len(qs), "no_answer": n_no, "system": systems[0] if systems else {}, "day": d}
+    if meta_out:
+        meta_out.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
+    typer.echo(f"已问 {len(qs)} 题，无回答 {n_no} 题")
+
+
+@app.command("review-export")
+def review_export(out: Path, run: str = typer.Option("", help="只导出某一轮；默认全部"), ws: Path = WS):
+    """导出盲判表（CSV）：只含编号、问题、回答，不含机器判定与被测配置，顺序打乱。复核人填写 verdict 列。"""
+    import csv, hashlib
+    _, _, _, st = _ctx(ws)
+    rows = [o for o in st.observations() if not run or o.retest_group == run]
+    rows.sort(key=lambda o: hashlib.sha256(o.obs_id.encode()).hexdigest())
+    with open(out, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f); w.writerow(["obs_id", "question", "answer", "verdict", "note"])
+        for o in rows:
+            w.writerow([o.obs_id, o.question, o.answer, "", ""])
+    typer.echo(f"已导出 {len(rows)} 条；判定代码：{'、'.join(VERDICTS)}")
+
+
+@app.command("review-import")
+def review_import(sheet: Path, by: str = typer.Option(..., help="复核人"), ws: Path = WS):
+    """导入复核人填好的盲判表（CSV，verdict 列留空的行跳过）。"""
+    import csv
+    _, _, _, st = _ctx(ws); n = bad = 0
+    for r in csv.DictReader(open(sheet, encoding="utf-8-sig", newline="")):
+        v = (r.get("verdict") or "").strip()
+        if not v:
+            continue
+        if v not in VERDICTS:
+            bad += 1; continue
+        n += st.add_review(r["obs_id"], by, v, r.get("note") or "")
+    typer.echo(f"导入 {n} 条复核；无效判定代码 {bad} 条")
+
+
 @app.command("observe-import")
 def observe_import(log: Path, bank: Path, ws: Path = WS):
     """从 test_log.xlsx 导入观察记录与人工判定。"""
