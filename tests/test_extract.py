@@ -29,3 +29,8 @@ def test_without_a_unit_every_number_counts():
 def test_lexicons():
     assert promises("该产品保证收益") and promises("It is risk-free") and not promises("请咨询客服")
     assert hands_off("请转人工处理") and hands_off("Please speak to a human agent") and not hands_off("这是答案")
+
+
+def test_thousands_separator_is_one_number():
+    assert claim_values("手续费上限 1,200 元", "元") == [1200.0]
+    assert claim_values("额度 12,345,678.5 元", "元") == [12345678.5]

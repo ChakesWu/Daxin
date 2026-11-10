@@ -50,3 +50,23 @@ def test_reviews_are_append_only_and_dispute_is_not_a_result(env):
 
 def test_lower_is_the_more_conservative_level():
     assert lower("L1", "L3") == "L3" and lower("L4", "L2") == "L4" and lower("L2", "L2") == "L2"
+
+
+def test_reviews_cannot_be_deleted(env):
+    import sqlite3
+    db, _, pol, st = env
+    st.add(obs(1)); st.add_review("O001", "甲", "通过")
+    with db.conn() as c:
+        with pytest.raises(sqlite3.IntegrityError):
+            c.execute("DELETE FROM reviews")
+    assert st.final_verdicts() == {"O001": "通过"}
+
+
+def test_judgments_are_per_rule_version_and_never_mixed(env):
+    from daxin import RULE_VERSION
+    from daxin.models import Judgment
+    _, _, pol, st = env
+    st.add(obs(1))
+    st.save_judgment(Judgment(obs_id="O001", rule_version="rules-old", verdict="C1"))
+    st.save_judgment(Judgment(obs_id="O001", rule_version=RULE_VERSION, verdict="通过"))
+    assert st.judgments()["O001"].verdict == "通过" and st.judgments("rules-old")["O001"].verdict == "C1"

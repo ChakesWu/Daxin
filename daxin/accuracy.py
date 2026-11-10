@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from . import RULE_VERSION
 from .models import ERRORS, SCORED
 from .observe import Store
 from .stats import cohen_kappa, wilson
@@ -47,6 +48,7 @@ def compare(pairs: list[tuple[str, str]]) -> dict:
 
 
 def from_store(store: Store, rule_version: str | None = None) -> dict:
+    rule_version = rule_version or RULE_VERSION
     final, machine = store.final_verdicts(), store.judgments(rule_version)
     pairs = [(final[o], machine[o].verdict) for o in final if o in machine and final[o] in SCORED + ("C5", "无回答")]
     out = compare(pairs)

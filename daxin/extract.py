@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 
 _D = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "兩": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
-NUM = r"(?:\d+(?:\.\d+)?|[零〇一二两兩三四五六七八九十百]+)"
+NUM = r"(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|[零〇一二两兩三四五六七八九十百]+)"
 _UNITS = {
     "笔": r"(?:笔|筆|次|宗|purchases?|transactions?|times|compras?)",
     "天": r"(?:天|日|个工作日|個工作日|工作日|days?|dias?)",
@@ -41,7 +41,7 @@ def cn_to_number(s: str) -> float | None:
 
 
 def _num(tok: str) -> float | None:
-    return float(tok) if tok[0].isdigit() else cn_to_number(tok)
+    return float(tok.replace(",", "")) if tok[0].isdigit() else cn_to_number(tok)
 
 
 def claim_values(text: str, unit: str = "") -> list[float]:

@@ -88,3 +88,10 @@ def test_superseded_versions_do_not_count_as_untested(env):
     clause(pol=pol, cid="F", version="v2", value=6, frm="2026-07-01")
     _pass_n(env, 5, "fee_waiver.min_purchases")
     assert report(pol, st)["年费免除"].untested == []
+
+
+def test_text_valued_facts_do_not_crash_generation(env):
+    clause(pol=env[2], cid="T1", key="note.text", value="以公告为准", unit="", region="R1")
+    clause(pol=env[2], cid="T2", key="note.text", value="另行通知", unit="", region="R2")
+    qs = generate(env[2], day=date(2026, 11, 3))
+    assert any("另行通知" in q.text for q in qs if q.kind == "boundary")

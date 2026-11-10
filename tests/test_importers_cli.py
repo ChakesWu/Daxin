@@ -65,8 +65,12 @@ def test_cli_demo_and_commands(tmp_path):
     out = runner.invoke(app, ["policy", "list", "--ws", str(ws)]).output
     assert "FEE-WAIVER-R1@v2" in out and "frozen" in out
     assert "冲突 0 处" in runner.invoke(app, ["policy", "conflicts", "--ws", str(ws)]).output
-    rel = runner.invoke(app, ["release", "--ws", str(ws), "--by", "topic,region"]).output
+    rel = runner.invoke(app, ["release", "--ws", str(ws), "--by", "topic,region", "--today", "2026-11-05"]).output
     assert "年费免除" in rel and "L1" in rel
+    stale = runner.invoke(app, ["release", "--ws", str(ws), "--by", "topic,region", "--today", "2027-06-01"]).output
+    assert "已过期" in stale and "L1" not in stale          # old results expire; the CLI default is today, never "no check"
+    seq_out = runner.invoke(app, ["audit-anchor", str(ws / "anchor.txt"), "--ws", str(ws)]).output
+    assert "锚点" in seq_out and runner.invoke(app, ["audit-verify", "--ws", str(ws), "--anchor", str(ws / "anchor.txt")]).exit_code == 0
     assert "daxin" in runner.invoke(app, ["--version"]).output
 
 

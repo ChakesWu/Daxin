@@ -5,7 +5,10 @@ import csv
 import re
 from pathlib import Path
 
-_LONG_NUM = re.compile(r"\d[\d ]{6,}\d")
+# Long digit runs (phone, card, id numbers) are masked, but NOT amounts: a run followed by a unit or currency word,
+# or preceded by a currency symbol, is a claim the judge must still be able to read (e.g. "额度 10000000 元").
+_UNIT = r"(?:元|块|圆|港元|人民币|HKD|RMB|CNY|yuan|dollars?|%|％|笔|筆|次|天|日|个|個|月|年|days?|months?|years?)"
+_LONG_NUM = re.compile(rf"(?<![\d¥￥$])\d[\d ]{{6,}}\d(?!\d)(?!\s*{_UNIT})", re.I)
 _EMAIL = re.compile(r"([\w.+-])[\w.+-]*@([\w-]+(?:\.[\w-]+)+)")
 
 

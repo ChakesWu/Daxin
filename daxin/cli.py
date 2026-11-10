@@ -111,9 +111,13 @@ def p_draft(doc: Path, ws: Path = WS, raw_dir: Path = typer.Option(None, help="�
     client = ReplayClient(raw_dir) if replay else LLMClient(model=model or None, record_dir=raw_dir, effort=effort)
     res = draft_facts(doc.read_text(encoding="utf-8"), client)
     cs = to_clauses(res, f"文档:{doc.name}", date.fromisoformat(effective_from) if effective_from else None)
+    written = 0
     for c in cs:
-        pol.add(c, "llm-draft")
-    typer.echo(f"草拟 {len(res.accepted)} 条通过核对，拒收 {len(res.rejected)} 条，写入草稿 {len(cs)} 条（均为未确认）；错误 {len(res.errors)}")
+        try:
+            pol.add(c, "llm-draft"); written += 1
+        except PolicyError as e:
+            typer.echo(f"  跳过（{e}）")
+    typer.echo(f"草拟 {len(res.accepted)} 条通过核对，拒收 {len(res.rejected)} 条，写入草稿 {written} 条（均为未确认）；错误 {len(res.errors)}")
     for r in res.rejected:
         typer.echo(f"  拒收[{r.reason}] {r.raw.get('key', '')} {r.raw.get('value', '')}")
     for f in res.accepted:
@@ -139,7 +143,7 @@ def coverage(ws: Path = WS):
 
 
 @app.command()
-def accuracy(ws: Path = WS, rule_version: str = typer.Option("", help="只看某一规则版本的判定，默认全部")):
+def accuracy(ws: Path = WS, rule_version: str = typer.Option("", help="只看某一规则版本的判定，默认当前版本")):
     """机器判定对人工复核（黄金集）的准确率：混淆矩阵、各类精确率、一致率与 kappa、误放行率，均附区间。"""
     from .accuracy import from_store, markdown
     _, _, _, st = _ctx(ws); typer.echo(markdown(from_store(st, rule_version or None)))
@@ -169,11 +173,11 @@ def review(obs_id: str, verdict: str, by: str = typer.Option(...), note: str = "
 
 
 @app.command()
-def release(ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD，用于判断放行是否过期"),
+def release(ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD，用于判断放行是否过期；默认今天"),
             by: str = typer.Option("topic,region,channel,language", help="分组维度，逗号分隔；不同分组不要加总")):
     """主题级放行矩阵。"""
     from .demo import show
-    _, _, pol, st = _ctx(ws); show(matrix(pol, st, today=date.fromisoformat(today) if today else None, group=tuple(x.strip() for x in by.split(",") if x.strip())))
+    _, _, pol, st = _ctx(ws); show(matrix(pol, st, today=date.fromisoformat(today) if today else date.today(), group=tuple(x.strip() for x in by.split(",") if x.strip())))
 
 
 @app.command()
@@ -190,8 +194,22 @@ def evidence(out: Path, ws: Path = WS, public: bool = typer.Option(False, help="
 
 
 @app.command("audit-verify")
-def audit_verify(ws: Path = WS):
-    ok, bad = _ctx(ws)[1].verify(); typer.echo("审计链通过" if ok else f"审计链第 {bad} 条异常"); raise typer.Exit(0 if ok else 1)
+def audit_verify(ws: Path = WS, anchor: Path = typer.Option(None, help="库外保存的锚点文件（audit-anchor 生成）；给出时同时核对链尾未被截断")):
+    a = _ctx(ws)[1]; ok, bad = a.verify()
+    typer.echo("审计链通过" if ok else f"审计链第 {bad} 条异常")
+    if ok and anchor:
+        seq, h = anchor.read_text().split()[-2:]
+        ok = a.verify_anchor(int(seq), h); typer.echo("锚点核对通过" if ok else f"锚点核对失败：第 {seq} 条已不存在或被改动")
+    raise typer.Exit(0 if ok else 1)
+
+
+@app.command("audit-anchor")
+def audit_anchor(out: Path, ws: Path = WS):
+    """把当前审计链头（序号与哈希）追加写到库外文件，供日后核对链尾是否被截断。请存放在另一块磁盘或另一套系统。"""
+    seq, h = _ctx(ws)[1].anchor()
+    with open(out, "a", encoding="utf-8") as f:
+        f.write(f"{date.today().isoformat()} {seq} {h}\n")
+    typer.echo(f"锚点：第 {seq} 条 {h[:12]}…")
 
 
 @app.command()

@@ -31,10 +31,16 @@ CREATE TABLE IF NOT EXISTS reviews(
   obs_id TEXT NOT NULL, reviewer TEXT NOT NULL, verdict TEXT NOT NULL, ts TEXT, note TEXT, PRIMARY KEY(obs_id, reviewer));
 CREATE TRIGGER IF NOT EXISTS reviews_no_update BEFORE UPDATE ON reviews
   BEGIN SELECT RAISE(ABORT, 'reviews are append-only'); END;
+CREATE TRIGGER IF NOT EXISTS reviews_no_delete BEFORE DELETE ON reviews
+  BEGIN SELECT RAISE(ABORT, 'reviews are append-only'); END;
 
 CREATE TABLE IF NOT EXISTS audit_events(
   seq INTEGER PRIMARY KEY, ts TEXT, actor TEXT, action TEXT, object_type TEXT, object_id TEXT,
   payload_sha256 TEXT, prev_hash TEXT, hash TEXT, mac TEXT);
+CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_events
+  BEGIN SELECT RAISE(ABORT, 'the audit log is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_events
+  BEGIN SELECT RAISE(ABORT, 'the audit log is append-only'); END;
 """
 
 

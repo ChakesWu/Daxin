@@ -57,3 +57,12 @@ def test_date_decides_the_standard(pol):
 def test_judgment_cites_the_clause_and_rule_version(pol):
     j = classify(obs(answer="刷满 3 笔"), pol)
     assert j.clause_ref == "F@v2" and j.rule_version and "F@v1" in j.reason
+
+
+def test_large_amounts_survive_masking_but_phone_numbers_do_not(env):
+    _, _, pol, st = env
+    clause(pol=pol, key="limit.amount", value=10000000, unit="元", topic="额度")
+    o = obs(1, answer="额度是 10000000 元，如有疑问请致电 98765432", key="limit.amount")
+    st.add(o); stored = st.observations()[0]
+    assert "10000000 元" in stored.answer and "98765432" not in stored.answer
+    assert classify(stored, pol).verdict == "通过"

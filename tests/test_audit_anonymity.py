@@ -1,3 +1,6 @@
+import sqlite3
+
+import pytest
 import pytest
 
 from daxin.anonymity import AnonymityError, assert_clean, load_names, mask_text
@@ -11,6 +14,10 @@ def test_chain_detects_tampering(tmp_path):
         a.append("u", "act", "obj", str(i), {"i": i})
     assert a.verify() == (True, None)
     with db.conn() as c:
+        with pytest.raises(sqlite3.IntegrityError):
+            c.execute("UPDATE audit_events SET actor='someone-else' WHERE seq=3")      # the database itself refuses
+    with db.conn() as c:                                                                # a privileged attacker drops the trigger first
+        c.execute("DROP TRIGGER audit_no_update")
         c.execute("UPDATE audit_events SET actor='someone-else' WHERE seq=3")
     assert a.verify() == (False, 3)
 
@@ -20,8 +27,24 @@ def test_deleting_an_event_breaks_the_chain(tmp_path):
     for i in range(4):
         a.append("u", "act", "obj", str(i))
     with db.conn() as c:
+        with pytest.raises(sqlite3.IntegrityError):
+            c.execute("DELETE FROM audit_events WHERE seq=2")
+    with db.conn() as c:
+        c.execute("DROP TRIGGER audit_no_delete")
         c.execute("DELETE FROM audit_events WHERE seq=2")
     assert a.verify()[0] is False
+
+
+def test_anchor_catches_tail_truncation_that_the_chain_cannot(tmp_path):
+    db = DB(tmp_path / "a.db"); a = Audit(db)
+    for i in range(4):
+        a.append("u", "act", "obj", str(i))
+    seq, h = a.anchor()
+    with db.conn() as c:
+        c.execute("DROP TRIGGER audit_no_delete")
+        c.execute("DELETE FROM audit_events WHERE seq=4")          # cut the newest event: the chain still verifies
+    assert a.verify() == (True, None)
+    assert a.verify_anchor(seq, h) is False and a.verify_anchor(3, a.events()[-1]["hash"]) is True
 
 
 def test_hmac_needs_the_key(tmp_path, monkeypatch):

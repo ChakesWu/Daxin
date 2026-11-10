@@ -55,3 +55,15 @@ class Audit:
     def head(self) -> str:
         ev = self.events()
         return ev[-1]["hash"] if ev else GENESIS
+
+    def anchor(self) -> tuple[int, str]:
+        """(seq, hash) of the newest event. Store it OUTSIDE the database (another disk or system): truncating the log's tail
+        is invisible to the chain itself, but not to an anchor taken earlier."""
+        ev = self.events()
+        return (ev[-1]["seq"], ev[-1]["hash"]) if ev else (0, GENESIS)
+
+    def verify_anchor(self, seq: int, h: str) -> bool:
+        """True if the event `seq` still exists with hash `h` (and so everything before it was not cut or changed)."""
+        if seq == 0:
+            return True
+        return any(e["seq"] == seq and e["hash"] == h for e in self.events())

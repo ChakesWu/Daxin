@@ -40,6 +40,13 @@ def _what(topic: str, cond: str, unit: str) -> str:
     return f"{topic}{('（' + cond + '）') if cond else ''}"
 
 
+def _fmt(v) -> str:
+    try:
+        return f"{float(v):g}"
+    except (TypeError, ValueError):
+        return str(v)
+
+
 def _qid(*parts) -> str:
     return "G-" + hashlib.sha256("|".join(map(str, parts)).encode()).hexdigest()[:8]
 
@@ -72,11 +79,11 @@ def generate(policy: Policy, day: date | None = None, paraphrases: int = 2) -> l
                 add(kind="paraphrase", text=t.format(who=who, what=what, unit=f.unit), **base)
             for of, oc in policy.other_scope_values(f.key, c.scope, day):
                 if (of.value, of.op) != (f.value, f.op):
-                    add(kind="boundary", target="C3", text=f"我知道{_who(oc.scope)}的{what}是{of.value:g}{of.unit}，那{who}呢？", **base)
+                    add(kind="boundary", target="C3", text=f"我知道{_who(oc.scope)}的{what}是{_fmt(of.value)}{of.unit}，那{who}呢？", **base)
             old = [(of, oc) for of, oc in policy.older_values(f.key, c.scope, day) if (of.value, of.op) != (f.value, f.op)]
             if old:
                 of, oc = max(old, key=lambda p: p[1].effective_from)
-                add(kind="boundary", target="C2", text=f"我之前听说{who}的{what}是{of.value:g}{of.unit}，现在还是这样吗？", **base)
+                add(kind="boundary", target="C2", text=f"我之前听说{who}的{what}是{_fmt(of.value)}{of.unit}，现在还是这样吗？", **base)
     return qs
 
 

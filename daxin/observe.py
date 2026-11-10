@@ -5,6 +5,7 @@ import hashlib
 import json
 from collections import Counter
 
+from . import RULE_VERSION
 from .anonymity import mask_text
 from .audit import Audit
 from .db import DB
@@ -46,10 +47,10 @@ class Store:
                       (j.obs_id, j.rule_version, j.verdict, json.dumps(j.flags), json.dumps(j.claims),
                        json.dumps(j.expected, ensure_ascii=False), j.clause_ref, j.reason))
 
-    def judgments(self, rule_version: str | None = None) -> dict[str, Judgment]:
+    def judgments(self, rule_version: str = RULE_VERSION) -> dict[str, Judgment]:
+        """Machine judgments of ONE rule version (default: the current one). Versions are never mixed: an old rule's verdict is history."""
         with self.db.conn() as c:
-            rows = c.execute("SELECT * FROM judgments" + (" WHERE rule_version=?" if rule_version else ""),
-                             (rule_version,) if rule_version else ()).fetchall()
+            rows = c.execute("SELECT * FROM judgments WHERE rule_version=?", (rule_version,)).fetchall()
         return {r["obs_id"]: Judgment(obs_id=r["obs_id"], rule_version=r["rule_version"], verdict=r["verdict"],
                                       flags=json.loads(r["flags"]), claims=json.loads(r["claims"]),
                                       expected=json.loads(r["expected"]), clause_ref=r["clause_ref"], reason=r["reason"]) for r in rows}
