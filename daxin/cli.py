@@ -138,6 +138,13 @@ def coverage(ws: Path = WS):
     _, _, pol, st = _ctx(ws); typer.echo(markdown(report(pol, st)))
 
 
+@app.command()
+def accuracy(ws: Path = WS, rule_version: str = typer.Option("", help="只看某一规则版本的判定，默认全部")):
+    """机器判定对人工复核（黄金集）的准确率：混淆矩阵、各类精确率、一致率与 kappa、误放行率，均附区间。"""
+    from .accuracy import from_store, markdown
+    _, _, _, st = _ctx(ws); typer.echo(markdown(from_store(st, rule_version or None)))
+
+
 @app.command("observe-import")
 def observe_import(log: Path, bank: Path, ws: Path = WS):
     """从 test_log.xlsx 导入观察记录与人工判定。"""
