@@ -74,6 +74,7 @@ class Observation(BaseModel):
     topic: str = ""
     must_handoff: bool = False
     recorder: str = ""
+    system_fp: str = ""             # fingerprint of the system under test (model, knowledge base, config); '' = unknown. KEEP LAST: DB column order
 
     @property
     def day(self) -> date:

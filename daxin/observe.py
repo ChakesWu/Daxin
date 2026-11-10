@@ -12,6 +12,9 @@ from .db import DB
 from .models import Judgment, Observation
 
 
+MIN_REVIEWERS = 2        # a verdict counts only when at least this many reviewers have judged the answer and they agree
+
+
 class Store:
     def __init__(self, db: DB, audit: Audit | None = None):
         self.db, self.audit = db, audit or Audit(db)
@@ -74,10 +77,13 @@ class Store:
             out.setdefault(r["obs_id"], []).append((r["reviewer"], r["verdict"]))
         return out
 
-    def final_verdicts(self) -> dict[str, str]:
-        """The verdict that counts: all reviewers agree -> that verdict; they disagree -> '待人工' (a dispute is not a result)."""
+    def final_verdicts(self, min_reviewers: int = MIN_REVIEWERS) -> dict[str, str]:
+        """The verdict that counts: at least `min_reviewers` reviewers, all agreeing -> that verdict; they disagree -> '待人工'
+        (a dispute is not a result). One reviewer alone is not a gold label: the answer stays 'not yet reviewed'."""
         out = {}
         for oid, rs in self.reviews().items():
+            if len(rs) < min_reviewers:
+                continue
             vs = Counter(v for _, v in rs)
             out[oid] = next(iter(vs)) if len(vs) == 1 else "待人工"
         return out

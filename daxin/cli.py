@@ -156,6 +156,7 @@ def ask(questions: Path, url: str, run: str = typer.Option(..., help="本轮编�
         authorized_host: str = typer.Option("", help="非本机主机须在此写明，并列入环境变量 DAXIN_HTTP_AUTHORIZED"),
         meta_out: Path = typer.Option(None, help="把被测系统指纹等元数据写到此 JSON（不要和盲判表一起给复核人）"), ws: Path = WS):
     """用 HTTP 适配器把自动出的题问给被测系统，回答存为观察。仅限授权测试环境；默认关闭（需 DAXIN_HTTP_ENABLED=1）；无回答记为“无回答”。"""
+    import hashlib
     import time as _t
     from .adapters.http import AdapterRefused, HttpAdapter
     from .models import Observation
@@ -173,7 +174,8 @@ def ask(questions: Path, url: str, run: str = typer.Option(..., help="本轮编�
         if meta.get("system"):
             systems.append(meta["system"])
         sc = q["scope"]
-        st.add(Observation(obs_id=f"{run}-{q['qid']}", ts=f"{d} {_t.strftime('%H:%M')}", inst="BANK-X", region=sc.get("region") or "", product=sc.get("product") or "",
+        fp = hashlib.sha256(json.dumps(meta.get("system", {}), sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16] if meta.get("system") else ""
+        st.add(Observation(system_fp=fp, obs_id=f"{run}-{q['qid']}", ts=f"{d} {_t.strftime('%H:%M')}", inst="BANK-X", region=sc.get("region") or "", product=sc.get("product") or "",
                            channel=sc.get("channel") or "官网", language="zh-Hans", question_id=q["qid"], session=run, retest_group=run, question=q["text"],
                            answer=ans, fact_key=q["fact_key"], topic=q["topic"], recorder="http-adapter"), actor())
     info = {"run": run, "asked": len(qs), "no_answer": n_no, "system": systems[0] if systems else {}, "day": d}

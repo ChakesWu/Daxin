@@ -17,7 +17,7 @@ CREATE TRIGGER IF NOT EXISTS clauses_frozen_delete BEFORE DELETE ON clauses WHEN
 CREATE TABLE IF NOT EXISTS observations(
   obs_id TEXT PRIMARY KEY, ts TEXT, inst TEXT, region TEXT, product TEXT, channel TEXT, language TEXT,
   question_id TEXT, session TEXT, turn INTEGER, retest_group TEXT, question TEXT, answer TEXT, answer_sha256 TEXT,
-  fact_key TEXT, topic TEXT, must_handoff INTEGER, recorder TEXT);
+  fact_key TEXT, topic TEXT, must_handoff INTEGER, recorder TEXT, system_fp TEXT DEFAULT '');
 CREATE TRIGGER IF NOT EXISTS obs_no_update BEFORE UPDATE ON observations
   BEGIN SELECT RAISE(ABORT, 'observations are append-only'); END;
 CREATE TRIGGER IF NOT EXISTS obs_no_delete BEFORE DELETE ON observations
@@ -50,6 +50,9 @@ class DB:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.conn() as c:
             c.executescript(SCHEMA)
+            cols = {r["name"] for r in c.execute("PRAGMA table_info(observations)")}
+            if "system_fp" not in cols:                       # workspaces made before fingerprints existed
+                c.execute("ALTER TABLE observations ADD COLUMN system_fp TEXT DEFAULT ''")
 
     @contextmanager
     def conn(self):

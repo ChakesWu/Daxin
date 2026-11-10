@@ -26,7 +26,7 @@ def clause(cid="FEE", version="v1", value=6, frm="2026-07-01", key="fee_waiver.m
 
 
 def obs(i=1, answer="每年刷满 6 笔可免年费", ts="2026-11-03 10:00", region="R1", key="fee_waiver.min_purchases", handoff=False, **kw):
-    d = dict(obs_id=f"O{i:03d}", ts=ts, inst="BANK-X", region=region, product="示例卡", channel="官网", language="zh-Hans", question_id="Q001",
+    d = dict(obs_id=f"O{i:03d}", ts=ts, inst="BANK-X", region=region, product="示例卡", channel="官网", language="zh-Hans", question_id=f"Q{i:03d}",
              topic="年费免除", question="年费怎么免？", answer=answer, fact_key=key, must_handoff=handoff)
     d.update(kw)
     return Observation(**d)

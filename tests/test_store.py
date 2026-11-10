@@ -55,7 +55,7 @@ def test_lower_is_the_more_conservative_level():
 def test_reviews_cannot_be_deleted(env):
     import sqlite3
     db, _, pol, st = env
-    st.add(obs(1)); st.add_review("O001", "甲", "通过")
+    st.add(obs(1)); st.add_review("O001", "甲", "通过"); st.add_review("O001", "乙", "通过")
     with db.conn() as c:
         with pytest.raises(sqlite3.IntegrityError):
             c.execute("DELETE FROM reviews")
@@ -70,3 +70,17 @@ def test_judgments_are_per_rule_version_and_never_mixed(env):
     st.save_judgment(Judgment(obs_id="O001", rule_version="rules-old", verdict="C1"))
     st.save_judgment(Judgment(obs_id="O001", rule_version=RULE_VERSION, verdict="通过"))
     assert st.judgments()["O001"].verdict == "通过" and st.judgments("rules-old")["O001"].verdict == "C1"
+
+
+def test_old_workspace_without_fingerprint_column_is_migrated(tmp_path):
+    import sqlite3
+    from daxin.db import DB
+    f = tmp_path / "old.db"
+    c = sqlite3.connect(f)
+    c.execute("CREATE TABLE observations(obs_id TEXT PRIMARY KEY, ts TEXT, inst TEXT, region TEXT, product TEXT, channel TEXT, language TEXT, "
+              "question_id TEXT, session TEXT, turn INTEGER, retest_group TEXT, question TEXT, answer TEXT, answer_sha256 TEXT, fact_key TEXT, "
+              "topic TEXT, must_handoff INTEGER, recorder TEXT)")
+    c.commit(); c.close()
+    db = DB(f)
+    with db.conn() as conn:
+        assert "system_fp" in {r["name"] for r in conn.execute("PRAGMA table_info(observations)")}

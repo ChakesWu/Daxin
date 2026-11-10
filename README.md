@@ -19,7 +19,7 @@
 ```bash
 pip install -e ".[dev]"
 daxin demo --dir .daxin-demo        # 端到端演示（仿真）
-python -m pytest -q                 # 116 项测试
+python -m pytest -q                 # 130 项测试
 ```
 
 演示会依次展示：冻结的条款无法被改动；对 200 余条仿真回答判定；放行矩阵；一次标准变更使放行降级；复测后恢复；证据卡与审计链校验。

@@ -44,20 +44,29 @@ def _num(tok: str) -> float | None:
     return float(tok.replace(",", "")) if tok[0].isdigit() else cn_to_number(tok)
 
 
-def claim_values(text: str, unit: str = "") -> list[float]:
-    """Numbers the answer states, tied to `unit` when the unit is known (so '3 days' is not read as a count of purchases)."""
+def claim_spans(text: str, unit: str = "") -> list[tuple[float, int, int]]:
+    """(value, start, end) of every number the answer states, tied to `unit` when known. Positions let the judge read each number's context."""
     text = text or ""
     if unit in _UNITS:
         pats = [rf"({NUM})\s*(?:个|個)?\s*{_UNITS[unit]}"]
         if unit in _LEAD:
             pats.append(rf"{_LEAD[unit]}({NUM})")
-        hits = [(m.start(), m.group(1)) for p in pats for m in re.finditer(p, text, re.I)]
+        hits = {(m.start(1), m.end(1), m.group(1)) for p in pats for m in re.finditer(p, text, re.I)}
     else:
-        hits = [(m.start(), m.group(0)) for m in re.finditer(NUM, text)]
-    out: list[float] = []
-    for _, tok in sorted(hits):
+        hits = {(m.start(), m.end(), m.group(0)) for m in re.finditer(NUM, text)}
+    out = []
+    for st, en, tok in sorted(hits):
         v = _num(tok)
-        if v is not None and v not in out:
+        if v is not None:
+            out.append((v, st, en))
+    return out
+
+
+def claim_values(text: str, unit: str = "") -> list[float]:
+    """Distinct numbers the answer states, tied to `unit` when the unit is known (so '3 days' is not read as a count of purchases)."""
+    out: list[float] = []
+    for v, _, _ in claim_spans(text, unit):
+        if v not in out:
             out.append(v)
     return out
 

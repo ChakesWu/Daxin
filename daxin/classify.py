@@ -6,7 +6,8 @@ C5 needs compliance review. Anything that cannot be decided becomes '待人工' 
 from __future__ import annotations
 
 from . import RULE_VERSION
-from .extract import claim_values, hands_off, promises
+from . import context as ctx
+from .extract import claim_spans, hands_off, promises
 from .models import Judgment, Observation
 from .policy import Policy, PolicyConflict
 
@@ -56,21 +57,50 @@ def _fact_verdict(obs: Observation, ans: str, policy: Policy):
         exp = float(fact.value)
     except (TypeError, ValueError):
         return "无法判断", "标准取值不是数字，需人工判断", fact.value, clause.ref, []
-    vals = claim_values(ans, fact.unit)
+    spans = claim_spans(ans, fact.unit)
+    vals = list(dict.fromkeys(v for v, _, _ in spans))
     if not vals:
         return "待人工", "回答中抽不到可比对的主张（不判通过）", exp, clause.ref, []
-    has_exp = any(_eq(v, exp) for v in vals)
-    others = [v for v in vals if not _eq(v, exp)]
-    if has_exp and not others:
-        return "通过", f"与 {clause.ref} 一致（{exp:g}）", exp, clause.ref, vals
-    if has_exp:
-        return "待人工", f"回答同时出现现行值 {exp:g} 与其他数字 {others}，无法确定哪个被当作现行规则", exp, clause.ref, vals
     olds = [(float(f.value), c) for f, c in policy.older_values(obs.fact_key, scope, day) if _num_ok(f.value)]
+    others_scope = [(float(f.value), c) for f, c in policy.other_scope_values(obs.fact_key, scope, day) if _num_ok(f.value)]
+    own = [x for x in (obs.region, obs.channel) if x]
+    other_labels = sorted({x for _, c in others_scope for x in (c.scope.region, c.scope.channel) if x} - set(own))
+    words = f"{obs.fact_key} {clause.topic} {fact.condition}"
+
+    cur, rest = [], []                       # numbers equal to the standard that are stated as current / everything else
+    for v, st, en in spans:
+        (cur if _eq(v, exp) and not ctx.is_historical(ans, st, en) else rest).append((v, st, en))
+    hist_exp = [sp for sp in rest if _eq(sp[0], exp)]
+    rest = [sp for sp in rest if not _eq(sp[0], exp)]
+
+    def excused(sp) -> bool:                  # clearly labelled as an old version or as another scope's rule
+        v, st, en = sp
+        if ctx.is_negated(ans, st):
+            return True
+        if ctx.is_historical(ans, st, en) and any(_eq(v, ov) for ov, _ in olds):
+            return True
+        return any(_eq(v, ov) for ov, _ in others_scope) and ctx.labelled_for_other_scope(ans, st, own, other_labels)
+
+    unexplained = [sp for sp in rest if not excused(sp)]
+    if cur and not unexplained:
+        for v, st, en in cur:
+            why = ctx.qualifier_problem(ans, st, en, fact.op, words)
+            if why:
+                return "待人工", f"回答含 {exp:g}，但{why}，数字相同不足以判通过", exp, clause.ref, vals
+        if all(ctx.labelled_for_other_scope(ans, st, own, other_labels) for _, st, _ in cur) and other_labels:
+            return "待人工", f"{exp:g} 出现在针对其他范围（{other_labels}）的说明里，不能确认适用于本范围", exp, clause.ref, vals
+        return "通过", f"与 {clause.ref} 一致（{exp:g}）", exp, clause.ref, vals
+    if cur:
+        left = [v for v, _, _ in unexplained]
+        return "待人工", f"回答同时出现现行值 {exp:g} 与其他数字 {left}，无法确定哪个被当作现行规则", exp, clause.ref, vals
+    if hist_exp and not unexplained:
+        return "待人工", f"现行值 {exp:g} 只作为旧版说明出现，回答没有把它说成现行规则", exp, clause.ref, vals
+    if rest and all(ctx.is_historical(ans, st, en) for _, st, en in rest):
+        return "待人工", "回答只提到旧版数字并说明已被取代，没有给出现行值", exp, clause.ref, vals
     for v in vals:
         for ov, oc in olds:
             if _eq(v, ov):
                 return "C2", f"回答 {v:g} 等于已被取代的旧版 {oc.ref}；现行为 {exp:g}（{clause.ref}）", exp, clause.ref, vals
-    others_scope = [(float(f.value), c) for f, c in policy.other_scope_values(obs.fact_key, scope, day) if _num_ok(f.value)]
     for v in vals:
         for ov, oc in others_scope:
             if _eq(v, ov):

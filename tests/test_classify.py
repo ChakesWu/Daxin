@@ -32,9 +32,49 @@ def test_promise_overlays(pol):
     assert j.verdict == "C2" and j.flags == ["C4"]                                    # the factual error stays the main class
 
 
-def test_old_and_current_value_together_is_not_a_pass(pol):
-    j = classify(obs(answer="原来 3 笔，现在 6 笔"), pol)
+def test_old_value_clearly_labelled_as_old_does_not_block_a_correct_answer(pol):
+    assert classify(obs(answer="原来 3 笔，现在 6 笔"), pol).verdict == "通过"
+    assert classify(obs(answer="现行刷满 6 笔免年费；此前的规则（满 3 笔）已被取代。"), pol).verdict == "通过"
+
+
+def test_superseded_marker_belongs_to_the_nearest_number(pol):
+    assert classify(obs(answer="自 7 月起改为满 6 笔免年费（此前满 3 笔的规则已被取代）"), pol).verdict == "通过"
+    assert classify(obs(answer="满 6 笔的规则已被取代，现在满 3 笔"), pol).verdict != "通过"
+
+
+def test_old_value_stated_as_current_is_never_a_pass(pol):
+    for a in ("原来 6 笔，现在 3 笔", "现在 3 笔，原来 6 笔"):
+        assert classify(obs(answer=a), pol).verdict != "通过", a
+    j = classify(obs(answer="刷满 6 笔和 5 笔免年费"), pol)
     assert j.verdict == "待人工" and "同时出现" in j.reason
+
+
+@pytest.mark.parametrize("answer,why", [
+    ("不需要刷满 6 笔，开卡即永久免年费", "否定"),
+    ("每月刷满 6 笔免年费", "周期"),
+    ("不超过 6 笔即可免年费", "方向"),
+    ("至少 6 笔免年费", "方向"),
+    ("不是 6 笔", "否定"),
+])
+def test_same_number_with_negation_period_or_direction_is_not_a_pass(pol, answer, why):
+    j = classify(obs(answer=answer), pol)
+    assert j.verdict == "待人工" and why in j.reason, (j.verdict, j.reason)
+
+
+def test_number_after_a_negation_clause_is_still_read_in_its_own_clause(pol):
+    assert classify(obs(answer="不是 3 笔，而是 6 笔"), pol).verdict == "通过"
+
+
+def test_thousands_separator_is_not_read_as_a_smaller_number(env):
+    _, _, pol, _ = env
+    clause(pol=pol, key="limit.amount", value=1200, unit="元", topic="额度")
+    assert classify(obs(answer="额度 1,200 元", key="limit.amount"), pol).verdict == "通过"
+    assert classify(obs(answer="额度 200 元", key="limit.amount"), pol).verdict == "C1"
+
+
+def test_other_regions_number_is_ignored_only_when_labelled_for_that_region(pol):
+    assert classify(obs(answer="R1 是 6 笔，R2 是 12 笔"), pol).verdict == "通过"
+    assert classify(obs(answer="R2 是 12 笔"), pol).verdict != "通过"
 
 
 def test_handoff_topics(pol):
