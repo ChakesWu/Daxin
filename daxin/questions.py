@@ -74,6 +74,11 @@ def generate(policy: Policy, day: date | None = None, paraphrases: int = 2) -> l
                 continue
             who, what = _who(c.scope), _what(c.topic, f.condition, f.unit)
             base = dict(fact_key=f.key, topic=c.topic, scope=c.scope, expected=f.value, unit=f.unit, clause_ref=c.ref)
+            if f.elements:                       # eligibility / documents: ask what is required; no 'which number' boundary questions
+                add(kind="basic", text=f"{who}的{what}有哪些要求？", **base)
+                for t in ("请问{who}的{what}，需要满足什么条件、准备什么？", "我想办{what}，{who}要准备什么？")[:paraphrases]:
+                    add(kind="paraphrase", text=t.format(who=who, what=what), **base)
+                continue
             add(kind="basic", text=f"{who}的{what}是多少{f.unit}？", **base)
             for t in PARAPHRASE[:paraphrases]:
                 add(kind="paraphrase", text=t.format(who=who, what=what, unit=f.unit), **base)

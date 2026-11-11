@@ -19,7 +19,7 @@
 ```bash
 pip install -e ".[dev]"
 daxin demo --dir .daxin-demo        # 端到端演示（仿真）
-python -m pytest -q                 # 130 项测试
+python -m pytest -q                 # 144 项测试
 ```
 
 演示会依次展示：冻结的条款无法被改动；对 200 余条仿真回答判定；放行矩阵；一次标准变更使放行降级；复测后恢复；证据卡与审计链校验。
@@ -53,6 +53,7 @@ daxin evidence out/evidence_cards.md --public      # 对外导出：需要 priva
 
 ```bash
 daxin questions --out out/questions.json     # 冻结标准 → 基础题 / 易混边界题 / 改写题
+daxin judge --llm --raw-dir raw               # 可选：LLM 标注数字归属（程式核对，判定另记版本 +llm）
 daxin coverage                               # 有未测事实的主题封顶 L3（完全没测 L4）
 daxin accuracy                               # 机器判定对人工复核的准确率、误放行率、kappa（均附区间）
 daxin ask q.json http://127.0.0.1:8801/ --run A1 --ws W   # HTTP 适配器（默认关闭，仅本机/授权主机，带节流）

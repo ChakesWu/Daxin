@@ -106,3 +106,43 @@ def test_large_amounts_survive_masking_but_phone_numbers_do_not(env):
     st.add(o); stored = st.observations()[0]
     assert "10000000 元" in stored.answer and "98765432" not in stored.answer
     assert classify(stored, pol).verdict == "通过"
+
+
+@pytest.fixture
+def docs(env):
+    from datetime import date
+    from daxin.models import Clause, Element, Fact, Scope
+    _, _, pol, _ = env
+    c = Clause(id="REISSUE-DOCS", version="v1", topic="挂失补发材料", scope=Scope(region="R1", product="示例卡"), effective_from=date(2026, 1, 1),
+               facts=[Fact(key="card_reissue.docs", value="身份证明、申请表",
+                           elements=[Element(name="身份证明", anchors=["身份证", "护照"]), Element(name="申请表", anchors=["申请表", "填写表格"])])])
+    pol.add(c, "t"); pol.confirm("REISSUE-DOCS", "v1", "t"); pol.freeze("REISSUE-DOCS", "v1", "t2")
+    return pol
+
+
+def test_required_elements_all_stated_is_a_pass(docs):
+    j = classify(obs(answer="需要带身份证和填写申请表。", key="card_reissue.docs"), docs)
+    assert j.verdict == "通过" and "全部 2 项" in j.reason
+    assert classify(obs(answer="请携带护照并填一张表", key="card_reissue.docs"), docs).verdict == "待人工"      # the form is described by a word that is not an anchor
+
+
+def test_missing_element_is_pending_human_not_an_error(docs):
+    j = classify(obs(answer="带上身份证就可以办理", key="card_reissue.docs"), docs)
+    assert j.verdict == "待人工" and "申请表" in j.reason
+
+
+def test_a_denied_element_is_never_a_pass(docs):
+    j = classify(obs(answer="不需要身份证，只要填写申请表", key="card_reissue.docs"), docs)
+    assert j.verdict == "待人工" and "否定" in j.reason
+    assert classify(obs(answer="需要身份证，无需申请表", key="card_reissue.docs"), docs).verdict == "待人工"
+
+
+def test_a_promise_still_overrides_an_element_pass(docs):
+    assert classify(obs(answer="身份证加申请表，保证当天办好", key="card_reissue.docs"), docs).verdict == "C4"
+
+
+def test_element_facts_get_requirement_questions(docs):
+    from datetime import date
+    from daxin.questions import generate
+    qs = generate(docs, date(2026, 11, 10))
+    assert {q.kind for q in qs} == {"basic", "paraphrase"} and "有哪些要求" in qs[0].text and qs[0].expected == "身份证明、申请表"

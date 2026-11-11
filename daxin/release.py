@@ -44,13 +44,13 @@ class Row:
 
 
 def matrix(policy: Policy, store: Store, today: date | None = None, max_age_days: int = 30,
-           group: tuple[str, ...] = ("topic", "region", "channel", "language")) -> list[Row]:
+           group: tuple[str, ...] = ("topic", "region", "channel", "language"), rule_version: str | None = None) -> list[Row]:
     obs, final = store.observations(), store.final_verdicts()
     groups: dict[tuple, list] = defaultdict(list)
     for o in obs:
         groups[tuple(getattr(o, g) for g in group)].append(o)
     total_scored = sum(1 for o in obs if final.get(o.obs_id) in SCORED) or 1
-    judg = store.judgments()
+    judg = store.judgments(rule_version) if rule_version else store.judgments()
     cov = coverage_report(policy, store)
     rows = []
     for key, os_ in sorted(groups.items()):

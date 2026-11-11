@@ -30,8 +30,8 @@ class Store:
             d = o.model_dump()
             d["must_handoff"] = int(d["must_handoff"])
             c.execute(f"INSERT INTO observations VALUES ({','.join('?' * len(d))})", tuple(d.values()))
-        self.audit.append(actor, "observation_recorded", "observation", o.obs_id,
-                          {k: v for k, v in o.model_dump().items() if k not in ("answer", "question")})
+            self.audit.append(actor, "observation_recorded", "observation", o.obs_id,
+                              {k: v for k, v in o.model_dump().items() if k not in ("answer", "question")}, conn=c)
         return True
 
     def observations(self, **where) -> list[Observation]:
@@ -66,7 +66,7 @@ class Store:
             if c.execute("SELECT 1 FROM reviews WHERE obs_id=? AND reviewer=?", (obs_id, reviewer)).fetchone():
                 return False
             c.execute("INSERT INTO reviews VALUES (?,?,?,?,?)", (obs_id, reviewer, verdict, ts, note))
-        self.audit.append(reviewer, "review_added", "observation", obs_id, {"verdict": verdict})
+            self.audit.append(reviewer, "review_added", "observation", obs_id, {"verdict": verdict}, conn=c)
         return True
 
     def reviews(self) -> dict[str, list[tuple[str, str]]]:

@@ -1,0 +1,51 @@
+{
+ "choices": [
+  {
+   "finish_reason": "stop",
+   "index": 0,
+   "message": {
+    "content": "{\"tags\":[{\"index\":0,\"about\":\"other_fact\",\"fact_key\":\"withdrawal.min_fee\",\"quote\":\"每笔最低收取 10 元\"}]}",
+    "role": "assistant"
+   }
+  }
+ ],
+ "created": 1794384905,
+ "id": "2026111116150330e89bf3bb6a4d6e",
+ "model": "glm-5.3-flashx",
+ "object": "chat.completion",
+ "request_id": "2026111116150330e89bf3bb6a4d6e",
+ "usage": {
+  "completion_tokens": 33,
+  "completion_tokens_details": {
+   "reasoning_tokens": 0
+  },
+  "prompt_tokens": 503,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "total_tokens": 536
+ },
+ "_daxin": {
+  "key": "1e2ebdd45a9aeb0dab54bfa6",
+  "model": "glm-5.3-flashx",
+  "params": {
+   "max_tokens": 3000,
+   "reasoning_effort": "low",
+   "temperature": 0,
+   "response_format": {
+    "type": "json_object"
+   }
+  },
+  "messages": [
+   {
+    "role": "system",
+    "content": "你是银行客服回答的标注助手。给你一段客服回答、被检查的事实，以及回答中出现的数字列表。请判断每个数字在回答里说的是什么，只输出 JSON。about 取值：this（说的就是被检查的事实）、old（被检查事实的旧版取值）、other_scope（被检查事实在其他地区或渠道的取值）、other_fact（候选事实列表里另一个事实，须给出 fact_key）、none（与任何政策事实无关，如电话、年限）。每项必须附 quote：逐字摘自回答、包含该数字的一小段。不确定就答 this。"
+   },
+   {
+    "role": "user",
+    "content": "被检查的事实：取现（withdrawal.daily_limit.mobile）现行取值 20000元\n候选的其他事实：{\"annual_fee.amount\": {\"topic\": \"年费\", \"value\": 300.0, \"unit\": \"元\"}, \"fee_waiver.min_purchases\": {\"topic\": \"年费免除\", \"value\": 12.0, \"unit\": \"笔\"}, \"repayment.interest_free_days\": {\"topic\": \"还款\", \"value\": 50.0, \"unit\": \"天\"}, \"repayment.overdue_daily_rate\": {\"topic\": \"还款\", \"value\": 0.05, \"unit\": \"%\"}, \"card_reissue.days\": {\"topic\": \"挂失补发\", \"value\": 7.0, \"unit\": \"天\"}, \"withdrawal.daily_limit.counter\": {\"topic\": \"取现\", \"value\": 50000.0, \"unit\": \"元\"}, \"withdrawal.min_fee\": {\"topic\": \"取现手续费\", \"value\": 10.0, \"unit\": \"元\"}, \"withdrawal.fee_rate\": {\"topic\": \"取现\", \"value\": 1.0, \"unit\": \"%\"}}\n回答：您好，通过手机银行渠道办理示例卡取现，每日取现限额为 20000 元；手续费为取现金额的 1%，每笔最低收取 10 元。\n数字：[{\"index\": 0, \"number\": 10.0, \"text\": \"的 1%，每笔最低收取 10 元。\"}]\n输出：{\"tags\":[{\"index\":0,\"about\":\"this|old|other_scope|other_fact|none\",\"fact_key\":\"\",\"quote\":\"逐字摘自回答的片段\"}]}"
+   }
+  ],
+  "latency_s": 1.56
+ }
+}

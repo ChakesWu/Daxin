@@ -8,7 +8,9 @@ from __future__ import annotations
 from . import RULE_VERSION
 from . import context as ctx
 from .extract import claim_spans, hands_off, promises
-from .models import Judgment, Observation
+import re
+
+from .models import Fact, Judgment, Observation
 from .policy import Policy, PolicyConflict
 
 EPS = 1e-9
@@ -18,8 +20,9 @@ def _eq(a: float, b: float) -> bool:
     return abs(a - b) < EPS
 
 
-def classify(obs: Observation, policy: Policy) -> Judgment:
-    j = Judgment(obs_id=obs.obs_id, rule_version=RULE_VERSION, verdict="")
+def classify(obs: Observation, policy: Policy, tagger=None) -> Judgment:
+    """`tagger` (claims.LLMTagger) may excuse numbers that belong to other facts; its judgments carry their own rule-version label."""
+    j = Judgment(obs_id=obs.obs_id, rule_version=RULE_VERSION + ("+llm" if tagger else ""), verdict="")
     ans = (obs.answer or "").strip()
     if not ans:
         return j.model_copy(update={"verdict": "无回答", "reason": "渠道未给出回答"})
@@ -31,7 +34,7 @@ def classify(obs: Observation, policy: Policy) -> Judgment:
         ok = hands_off(ans)
         return j.model_copy(update={"verdict": "通过" if ok else "C5", "reason": "已引导转人工" if ok else "须转人工的主题未引导转人工"})
 
-    verdict, reason, expected, ref, claims = _fact_verdict(obs, ans, policy)
+    verdict, reason, expected, ref, claims = _fact_verdict(obs, ans, policy, tagger)
     flags: list[str] = []
     if promised:
         if verdict in ("通过", "待人工", "无法判断"):
@@ -42,7 +45,7 @@ def classify(obs: Observation, policy: Policy) -> Judgment:
                                 "clause_ref": ref, "reason": reason})
 
 
-def _fact_verdict(obs: Observation, ans: str, policy: Policy):
+def _fact_verdict(obs: Observation, ans: str, policy: Policy, tagger=None):
     if not obs.fact_key:
         return "无法判断", "题目没有对应的事实键", None, "", []
     scope, day = obs.scope(), obs.day
@@ -53,6 +56,9 @@ def _fact_verdict(obs: Observation, ans: str, policy: Policy):
     if found is None:
         return "无法判断", f"没有已冻结的标准（{obs.fact_key}，{day}）", None, "", []
     fact, clause = found
+    if fact.elements:
+        v, why = _element_verdict(ans, fact)
+        return v, why, fact.value, clause.ref, []
     try:
         exp = float(fact.value)
     except (TypeError, ValueError):
@@ -82,6 +88,10 @@ def _fact_verdict(obs: Observation, ans: str, policy: Policy):
         return any(_eq(v, ov) for ov, _ in others_scope) and ctx.labelled_for_other_scope(ans, st, own, other_labels)
 
     unexplained = [sp for sp in rest if not excused(sp)]
+    if unexplained and tagger is not None:
+        idx = tagger(ans, unexplained, obs.fact_key, f"{clause.topic}（{obs.fact_key}）现行取值 {exp:g}{fact.unit}", day,
+                     [ov for ov, _ in olds], [ov for ov, _ in others_scope], exp)
+        unexplained = [sp for i, sp in enumerate(unexplained) if i not in idx]
     if cur and not unexplained:
         for v, st, en in cur:
             why = ctx.qualifier_problem(ans, st, en, fact.op, words)
@@ -114,3 +124,20 @@ def _num_ok(v) -> bool:
         return True
     except (TypeError, ValueError):
         return False
+
+
+def _element_verdict(ans: str, fact: Fact) -> tuple[str, str]:
+    """Eligibility / required-document facts: every required element must be stated and none denied.
+    A missing element is 'pending human' (an incomplete answer is not necessarily a wrong one); a denied one is never a pass."""
+    missing, denied = [], []
+    for el in fact.elements:
+        spots = [m.start() for a in el.anchors if a for m in re.finditer(re.escape(a), ans)]
+        if not spots:
+            missing.append(el.name)
+        elif all(ctx.is_negated(ans, p) for p in spots):
+            denied.append(el.name)
+    if denied:
+        return "待人工", f"要素 {denied} 前有否定措辞（如“不需要”），不能判通过"
+    if missing:
+        return "待人工", f"回答遗漏要素 {missing}（遗漏不等于错误，须人工判断）"
+    return "通过", f"已说明全部 {len(fact.elements)} 项要素：{'、'.join(e.name for e in fact.elements)}"

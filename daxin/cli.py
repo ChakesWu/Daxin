@@ -220,12 +220,20 @@ def observe_import(log: Path, bank: Path, ws: Path = WS):
 
 
 @app.command()
-def judge(ws: Path = WS):
+def judge(ws: Path = WS, llm: bool = typer.Option(False, "--llm", help="用 LLM 标注数字归属（程式核对引文与取值；判定另记版本 +llm，不与纯规则混用）"),
+          raw_dir: Path = typer.Option(None, help="保存模型原始输出（可离线重放）"), replay: bool = typer.Option(False, help="只从 raw-dir 重放，不联网")):
     """对所有观察运行判定（机器建议；不参与统计）。"""
     _, _, pol, st = _ctx(ws); dist: dict[str, int] = {}
+    tagger = None
+    if llm:
+        from .claims import LLMTagger
+        from .llm import LLMClient, ReplayClient
+        tagger = LLMTagger(ReplayClient(raw_dir) if replay else LLMClient(record_dir=raw_dir, effort="low", max_tokens=3000), pol)
     for o in st.observations():
-        j = classify(o, pol); st.save_judgment(j); dist[j.verdict] = dist.get(j.verdict, 0) + 1
-    typer.echo("判定分布：" + "，".join(f"{k} {v}" for k, v in sorted(dist.items())))
+        j = classify(o, pol, tagger); st.save_judgment(j); dist[j.verdict] = dist.get(j.verdict, 0) + 1
+    typer.echo("判定分布：" + "，".join(f"{k} {v}" for k, v in sorted(dist.items())) + ("（LLM 辅助，版本 " + RULE_VERSION + "+llm）" if llm else ""))
+    if tagger and tagger.notes:
+        typer.echo(f"标注失败 {len(tagger.notes)} 次，这些回答按纯规则处理")
 
 
 @app.command()
@@ -237,11 +245,11 @@ def review(obs_id: str, verdict: str, by: str = typer.Option(...), note: str = "
 
 
 @app.command()
-def release(ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD，用于判断放行是否过期；默认今天"),
+def release(ws: Path = WS, llm: bool = typer.Option(False, "--llm", help="读取 LLM 辅助的判定（版本 +llm）"), today: str = typer.Option("", help="YYYY-MM-DD，用于判断放行是否过期；默认今天"),
             by: str = typer.Option("topic,region,channel,language", help="分组维度，逗号分隔；不同分组不要加总")):
     """主题级放行矩阵。"""
     from .demo import show
-    _, _, pol, st = _ctx(ws); show(matrix(pol, st, today=date.fromisoformat(today) if today else date.today(), group=tuple(x.strip() for x in by.split(",") if x.strip())))
+    _, _, pol, st = _ctx(ws); show(matrix(pol, st, rule_version=RULE_VERSION + "+llm" if llm else None, today=date.fromisoformat(today) if today else date.today(), group=tuple(x.strip() for x in by.split(",") if x.strip())))
 
 
 @app.command()
