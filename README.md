@@ -53,6 +53,7 @@ daxin evidence out/evidence_cards.md --public      # 对外导出：需要 priva
 
 ```bash
 daxin questions --out out/questions.json     # 冻结标准 → 基础题 / 易混边界题 / 改写题
+daxin console out.html                        # 只读证据台网页（--blind 为复核人盲测视图）
 daxin judge --llm --raw-dir raw               # 可选：LLM 标注数字归属（程式核对，判定另记版本 +llm）
 daxin coverage                               # 有未测事实的主题封顶 L3（完全没测 L4）
 daxin accuracy                               # 机器判定对人工复核的准确率、误放行率、kappa（均附区间）

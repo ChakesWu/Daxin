@@ -253,6 +253,17 @@ def release(ws: Path = WS, llm: bool = typer.Option(False, "--llm", help="读取
 
 
 @app.command()
+def console(out: Path, ws: Path = WS, blind: bool = typer.Option(False, help="盲测视图：隐藏机器与人工判定，供复核人使用"),
+            llm: bool = typer.Option(False, "--llm", help="读取 LLM 辅助的判定（版本 +llm）"), today: str = typer.Option("", help="YYYY-MM-DD")):
+    """导出只读的证据台网页（离线单文件）。"""
+    from .console import build as cbuild, render
+    _, a, pol, st = _ctx(ws)
+    data = cbuild(pol, st, a, today=date.fromisoformat(today) if today else None, blind=blind, rule_version=RULE_VERSION + "+llm" if llm else None)
+    Path(out).parent.mkdir(parents=True, exist_ok=True); Path(out).write_text(render(data), encoding="utf-8")
+    typer.echo(f"证据台（{'盲测' if blind else '完整'}视图，{len(data['items'])} 条回答）→ {out}")
+
+
+@app.command()
 def evidence(out: Path, ws: Path = WS, public: bool = typer.Option(False, help="对外输出：检查是否含机构名称")):
     """导出证据卡。--public 需要 private/institution_map.csv。"""
     _, _, pol, st = _ctx(ws); cards = build_cards(pol, st); text = markdown(cards)
