@@ -1,0 +1,55 @@
+{
+ "A1": {
+  "run": "A1",
+  "asked": 34,
+  "no_answer": 0,
+  "system": {
+   "gen_model": "glm-5.3-flashx",
+   "embed_model": "embedding-3",
+   "config": {
+    "top_k": 3,
+    "include_old": true,
+    "region_filter": false,
+    "drop_current": []
+   },
+   "kb_sha": "02e07fd3452d"
+  },
+  "day": "2026-11-10"
+ },
+ "B2": {
+  "run": "B2",
+  "asked": 34,
+  "no_answer": 0,
+  "system": {
+   "gen_model": "glm-5.3-flashx",
+   "embed_model": "embedding-3",
+   "config": {
+    "top_k": 3,
+    "include_old": false,
+    "region_filter": true,
+    "drop_current": []
+   },
+   "kb_sha": "04a22d7faa01"
+  },
+  "day": "2026-11-10"
+ },
+ "C3": {
+  "run": "C3",
+  "asked": 34,
+  "no_answer": 0,
+  "system": {
+   "gen_model": "glm-5.3-flashx",
+   "embed_model": "embedding-3",
+   "config": {
+    "top_k": 3,
+    "include_old": true,
+    "region_filter": false,
+    "drop_current": [
+     "fee_waiver.min_purchases"
+    ]
+   },
+   "kb_sha": "d51052cd72aa"
+  },
+  "day": "2026-11-10"
+ }
+}

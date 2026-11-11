@@ -100,6 +100,119 @@ def p_conflicts(ws: Path = WS):
     typer.echo(f"冲突 {len(cs)} 处")
 
 
+@policy_app.command("draft")
+def p_draft(doc: Path, ws: Path = WS, raw_dir: Path = typer.Option(None, help="保存模型原始输出（可离线重放）"),
+            replay: bool = typer.Option(False, help="只从 raw-dir 重放，不联网"), effective_from: str = typer.Option("", help="原文无日期时由人工指定"),
+            model: str = typer.Option("", help="默认 DAXIN_LLM_MODEL 或 glm-5.3-flashx"), effort: str = typer.Option("high")):
+    """用 LLM 从制度原文草拟事实。引文须逐字存在于原文且含该数字，否则拒收；结果只进草稿，须人工确认。"""
+    from .draft import draft_facts, to_clauses
+    from .llm import LLMClient, ReplayClient
+    _, _, pol, _ = _ctx(ws)
+    client = ReplayClient(raw_dir) if replay else LLMClient(model=model or None, record_dir=raw_dir, effort=effort)
+    res = draft_facts(doc.read_text(encoding="utf-8"), client)
+    cs = to_clauses(res, f"文档:{doc.name}", date.fromisoformat(effective_from) if effective_from else None)
+    written = 0
+    for c in cs:
+        try:
+            pol.add(c, "llm-draft"); written += 1
+        except PolicyError as e:
+            typer.echo(f"  跳过（{e}）")
+    typer.echo(f"草拟 {len(res.accepted)} 条通过核对，拒收 {len(res.rejected)} 条，写入草稿 {written} 条（均为未确认）；错误 {len(res.errors)}")
+    for r in res.rejected:
+        typer.echo(f"  拒收[{r.reason}] {r.raw.get('key', '')} {r.raw.get('value', '')}")
+    for f in res.accepted:
+        for w in f.warnings:
+            typer.echo(f"  待核[{f.key}={f.value}] {w}")
+
+
+@app.command()
+def questions(out: Path = typer.Option(None, help="写出 JSON"), day: str = "", ws: Path = WS):
+    """由已冻结的标准自动出题（基础题、易混边界题、改写题）。"""
+    from .questions import generate, summary
+    _, _, pol, _ = _ctx(ws); qs = generate(pol, date.fromisoformat(day) if day else None)
+    typer.echo(str(summary(qs)))
+    if out:
+        out.write_text(json.dumps([q.model_dump(mode="json") for q in qs], ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+@app.command()
+def coverage(ws: Path = WS):
+    """各主题的事实覆盖情况；有未测事实的主题放行封顶 L3（完全没测为 L4）。"""
+    from .coverage import markdown, report
+    _, _, pol, st = _ctx(ws); typer.echo(markdown(report(pol, st)))
+
+
+@app.command()
+def accuracy(ws: Path = WS, rule_version: str = typer.Option("", help="只看某一规则版本的判定，默认当前版本")):
+    """机器判定对人工复核（黄金集）的准确率：混淆矩阵、各类精确率、一致率与 kappa、误放行率，均附区间。"""
+    from .accuracy import from_store, markdown
+    _, _, _, st = _ctx(ws); typer.echo(markdown(from_store(st, rule_version or None)))
+
+
+@app.command()
+def ask(questions: Path, url: str, run: str = typer.Option(..., help="本轮编号；用不透明的代号（如 A1），不要写出被测配置，免得盲判时泄露"),
+        day: str = typer.Option("", help="提问日期 YYYY-MM-DD，默认今天（判定按该日的现行标准）"), limit: int = typer.Option(0, help="只问前 N 题，0 为全部"),
+        interval: float = typer.Option(1.0, help="两次请求的最小间隔秒数；下限 0.5，不可再低"), timeout: float = typer.Option(60.0),
+        authorized_host: str = typer.Option("", help="非本机主机须在此写明，并列入环境变量 DAXIN_HTTP_AUTHORIZED"),
+        meta_out: Path = typer.Option(None, help="把被测系统指纹等元数据写到此 JSON（不要和盲判表一起给复核人）"), ws: Path = WS):
+    """用 HTTP 适配器把自动出的题问给被测系统，回答存为观察。仅限授权测试环境；默认关闭（需 DAXIN_HTTP_ENABLED=1）；无回答记为“无回答”。"""
+    import hashlib
+    import time as _t
+    from .adapters.http import AdapterRefused, HttpAdapter
+    from .models import Observation
+    try:
+        ad = HttpAdapter(url, interval, timeout, authorized_host)
+    except AdapterRefused as e:
+        typer.echo(str(e)); raise typer.Exit(2)
+    _, _, _, st = _ctx(ws)
+    qs = json.loads(questions.read_text(encoding="utf-8"))
+    qs = qs[:limit] if limit else qs
+    d = day or date.today().isoformat(); n_no = 0; systems = []
+    for q in qs:
+        ans, meta = ad.ask(q["text"])
+        n_no += not ans
+        if meta.get("system"):
+            systems.append(meta["system"])
+        sc = q["scope"]
+        fp = hashlib.sha256(json.dumps(meta.get("system", {}), sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:16] if meta.get("system") else ""
+        st.add(Observation(system_fp=fp, obs_id=f"{run}-{q['qid']}", ts=f"{d} {_t.strftime('%H:%M')}", inst="BANK-X", region=sc.get("region") or "", product=sc.get("product") or "",
+                           channel=sc.get("channel") or "官网", language="zh-Hans", question_id=q["qid"], session=run, retest_group=run, question=q["text"],
+                           answer=ans, fact_key=q["fact_key"], topic=q["topic"], recorder="http-adapter"), actor())
+    info = {"run": run, "asked": len(qs), "no_answer": n_no, "system": systems[0] if systems else {}, "day": d}
+    if meta_out:
+        meta_out.write_text(json.dumps(info, ensure_ascii=False, indent=1), encoding="utf-8")
+    typer.echo(f"已问 {len(qs)} 题，无回答 {n_no} 题")
+
+
+@app.command("review-export")
+def review_export(out: Path, run: str = typer.Option("", help="只导出某一轮；默认全部"), ws: Path = WS):
+    """导出盲判表（CSV）：只含编号、问题、回答，不含机器判定与被测配置，顺序打乱。复核人填写 verdict 列。"""
+    import csv, hashlib
+    _, _, _, st = _ctx(ws)
+    rows = [o for o in st.observations() if not run or o.retest_group == run]
+    rows.sort(key=lambda o: hashlib.sha256(o.obs_id.encode()).hexdigest())
+    with open(out, "w", encoding="utf-8-sig", newline="") as f:
+        w = csv.writer(f); w.writerow(["obs_id", "question", "answer", "verdict", "note"])
+        for o in rows:
+            w.writerow([o.obs_id, o.question, o.answer, "", ""])
+    typer.echo(f"已导出 {len(rows)} 条；判定代码：{'、'.join(VERDICTS)}")
+
+
+@app.command("review-import")
+def review_import(sheet: Path, by: str = typer.Option(..., help="复核人"), ws: Path = WS):
+    """导入复核人填好的盲判表（CSV，verdict 列留空的行跳过）。"""
+    import csv
+    _, _, _, st = _ctx(ws); n = bad = 0
+    for r in csv.DictReader(open(sheet, encoding="utf-8-sig", newline="")):
+        v = (r.get("verdict") or "").strip()
+        if not v:
+            continue
+        if v not in VERDICTS:
+            bad += 1; continue
+        n += st.add_review(r["obs_id"], by, v, r.get("note") or "")
+    typer.echo(f"导入 {n} 条复核；无效判定代码 {bad} 条")
+
+
 @app.command("observe-import")
 def observe_import(log: Path, bank: Path, ws: Path = WS):
     """从 test_log.xlsx 导入观察记录与人工判定。"""
@@ -107,12 +220,20 @@ def observe_import(log: Path, bank: Path, ws: Path = WS):
 
 
 @app.command()
-def judge(ws: Path = WS):
+def judge(ws: Path = WS, llm: bool = typer.Option(False, "--llm", help="用 LLM 标注数字归属（程式核对引文与取值；判定另记版本 +llm，不与纯规则混用）"),
+          raw_dir: Path = typer.Option(None, help="保存模型原始输出（可离线重放）"), replay: bool = typer.Option(False, help="只从 raw-dir 重放，不联网")):
     """对所有观察运行判定（机器建议；不参与统计）。"""
     _, _, pol, st = _ctx(ws); dist: dict[str, int] = {}
+    tagger = None
+    if llm:
+        from .claims import LLMTagger
+        from .llm import LLMClient, ReplayClient
+        tagger = LLMTagger(ReplayClient(raw_dir) if replay else LLMClient(record_dir=raw_dir, effort="low", max_tokens=3000), pol)
     for o in st.observations():
-        j = classify(o, pol); st.save_judgment(j); dist[j.verdict] = dist.get(j.verdict, 0) + 1
-    typer.echo("判定分布：" + "，".join(f"{k} {v}" for k, v in sorted(dist.items())))
+        j = classify(o, pol, tagger); st.save_judgment(j); dist[j.verdict] = dist.get(j.verdict, 0) + 1
+    typer.echo("判定分布：" + "，".join(f"{k} {v}" for k, v in sorted(dist.items())) + ("（LLM 辅助，版本 " + RULE_VERSION + "+llm）" if llm else ""))
+    if tagger and tagger.notes:
+        typer.echo(f"标注失败 {len(tagger.notes)} 次，这些回答按纯规则处理")
 
 
 @app.command()
@@ -124,11 +245,22 @@ def review(obs_id: str, verdict: str, by: str = typer.Option(...), note: str = "
 
 
 @app.command()
-def release(ws: Path = WS, today: str = typer.Option("", help="YYYY-MM-DD，用于判断放行是否过期"),
+def release(ws: Path = WS, llm: bool = typer.Option(False, "--llm", help="读取 LLM 辅助的判定（版本 +llm）"), today: str = typer.Option("", help="YYYY-MM-DD，用于判断放行是否过期；默认今天"),
             by: str = typer.Option("topic,region,channel,language", help="分组维度，逗号分隔；不同分组不要加总")):
     """主题级放行矩阵。"""
     from .demo import show
-    _, _, pol, st = _ctx(ws); show(matrix(pol, st, today=date.fromisoformat(today) if today else None, group=tuple(x.strip() for x in by.split(",") if x.strip())))
+    _, _, pol, st = _ctx(ws); show(matrix(pol, st, rule_version=RULE_VERSION + "+llm" if llm else None, today=date.fromisoformat(today) if today else date.today(), group=tuple(x.strip() for x in by.split(",") if x.strip())))
+
+
+@app.command()
+def console(out: Path, ws: Path = WS, blind: bool = typer.Option(False, help="盲测视图：隐藏机器与人工判定，供复核人使用"),
+            llm: bool = typer.Option(False, "--llm", help="读取 LLM 辅助的判定（版本 +llm）"), today: str = typer.Option("", help="YYYY-MM-DD")):
+    """导出只读的证据台网页（离线单文件）。"""
+    from .console import build as cbuild, render
+    _, a, pol, st = _ctx(ws)
+    data = cbuild(pol, st, a, today=date.fromisoformat(today) if today else None, blind=blind, rule_version=RULE_VERSION + "+llm" if llm else None)
+    Path(out).parent.mkdir(parents=True, exist_ok=True); Path(out).write_text(render(data), encoding="utf-8")
+    typer.echo(f"证据台（{'盲测' if blind else '完整'}视图，{len(data['items'])} 条回答）→ {out}")
 
 
 @app.command()
@@ -145,8 +277,22 @@ def evidence(out: Path, ws: Path = WS, public: bool = typer.Option(False, help="
 
 
 @app.command("audit-verify")
-def audit_verify(ws: Path = WS):
-    ok, bad = _ctx(ws)[1].verify(); typer.echo("审计链通过" if ok else f"审计链第 {bad} 条异常"); raise typer.Exit(0 if ok else 1)
+def audit_verify(ws: Path = WS, anchor: Path = typer.Option(None, help="库外保存的锚点文件（audit-anchor 生成）；给出时同时核对链尾未被截断")):
+    a = _ctx(ws)[1]; ok, bad = a.verify()
+    typer.echo("审计链通过" if ok else f"审计链第 {bad} 条异常")
+    if ok and anchor:
+        seq, h = anchor.read_text().split()[-2:]
+        ok = a.verify_anchor(int(seq), h); typer.echo("锚点核对通过" if ok else f"锚点核对失败：第 {seq} 条已不存在或被改动")
+    raise typer.Exit(0 if ok else 1)
+
+
+@app.command("audit-anchor")
+def audit_anchor(out: Path, ws: Path = WS):
+    """把当前审计链头（序号与哈希）追加写到库外文件，供日后核对链尾是否被截断。请存放在另一块磁盘或另一套系统。"""
+    seq, h = _ctx(ws)[1].anchor()
+    with open(out, "a", encoding="utf-8") as f:
+        f.write(f"{date.today().isoformat()} {seq} {h}\n")
+    typer.echo(f"锚点：第 {seq} 条 {h[:12]}…")
 
 
 @app.command()

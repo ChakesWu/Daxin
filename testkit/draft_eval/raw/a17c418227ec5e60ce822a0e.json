@@ -1,0 +1,52 @@
+{
+ "choices": [
+  {
+   "finish_reason": "stop",
+   "index": 0,
+   "message": {
+    "content": "{\"facts\":[\n{\"key\":\"fee_waiver.min_purchases\",\"topic\":\"年费免收消费笔数\",\"value\":6,\"op\":\">=\",\"unit\":\"笔/年\",\"condition\":\"免次年年费\",\"product\":\"示例卡\",\"region\":\"R1 地区\",\"channel\":null,\"effective_from\":\"2026-07-01\",\"quote\":\"R1 地区示例卡持卡人，自 2026 年 7 月 1 日起，每年消费满 6 笔即可免次年年费。\"},\n{\"key\":\"fee_waiver.min_purchases.old\",\"topic\":\"年费免收消费笔数\",\"value\":8,\"op\":\">=\",\"unit\":\"笔/年\",\"condition\":\"旧版，已被现行规定取代\",\"product\":\"示例卡\",\"region\":\"R1 地区\",\"channel\":null,\"effective_from\":null,\"quote\":\"该条款取代此前“满 8 笔”的规定。\"},\n{\"key\":\"fee_waiver.min_purchases.r2\",\"topic\":\"年费免收消费笔数\",\"value\":12,\"op\":\">=\",\"unit\":\"笔/年\",\"condition\":\"免次年年费\",\"product\":\"示例卡\",\"region\":\"R2 地区\",\"channel\":null,\"effective_from\":\"2026-01-01\",\"quote\":\"R2 地区示例卡持卡人，每年消费满 12 笔可免次年年费，R2 地区的标准自 2026 年 1 月 1 日起生效。\"},\n{\"key\":\"annual_fee.amount\",\"topic\":\"年费金额\",\"value\":300,\"op\":\"=\",\"unit\":\"元/年\",\"condition\":\"\",\"product\":\"示例卡\",\"region\":null,\"channel\":null,\"effective_from\":null,\"quote\":\"示例卡年费为每年 300 元。\"},\n{\"key\":\"withdrawal.fee_rate\",\"topic\":\"取现手续费费率\",\"value\":1,\"op\":\"=\",\"unit\":\"%\",\"condition\":\"按取现金额计收\",\"product\":\"示例卡\",\"region\":null,\"channel\":null,\"effective_from\":null,\"quote\":\"示例卡取现手续费为取现金额的 1%，每笔最低收取 10 元。\"},\n{\"key\":\"withdrawal.min_fee_per_txn\",\"topic\":\"取现手续费每笔最低金额\",\"value\":10,\"op\":\"=\",\"unit\":\"元/笔\",\"condition\":\"\",\"product\":\"示例卡\",\"region\":null,\"channel\":null,\"effective_from\":null,\"quote\":\"示例卡取现手续费为取现金额的 1%，每笔最低收取 10 元。\"},\n{\"key\":\"withdrawal.daily_limit.mobile_banking\",\"topic\":\"每日取现限额\",\"value\":20000,\"op\":\"=\",\"unit\":\"元/天\",\"condition\":\"每日取现限额\",\"product\":\"示例卡\",\"region\":null,\"channel\":\"手机银行\",\"effective_from\":null,\"quote\":\"通过手机银行渠道办理的示例卡取现，每日取现限额为 20000 元；柜台渠道每日限额为 50000 元。\"},\n{\"key\":\"withdrawal.daily_limit.counter\",\"topic\":\"每日取现限额\",\"value\":50000,\"op\":\"=\",\"unit\":\"元/天\",\"condition\":\"每日限额\",\"product\":\"示例卡\",\"region\":null,\"channel\":\"柜台\",\"effective_from\":null,\"quote\":\"通过手机银行渠道办理的示例卡取现，每日取现限额为 20000 元；柜台渠道每日限额为 50000 元。\"},\n{\"key\":\"repayment.max_interest_free_days\",\"topic\":\"免息还款期\",\"value\":50,\"op\":\"<=\",\"unit\":\"天\",\"condition\":\"最长免息还款期\",\"product\":\"示例卡\",\"region\":null,\"channel\":null,\"effective_from\":null,\"quote\":\"示例卡免息还款期最长 50 天。\"},\n{\"key\":\"repayment.overdue_daily_rate\",\"topic\":\"逾期还款日利率\",\"value\":0.05,\"op\":\"=\",\"unit\":\"%/天\",\"condition\":\"逾期还款\",\"product\":\"示例卡\",\"region\":null,\"channel\":null,\"effective_from\":null,\"quote\":\"逾期还款将按日利率 0.05% 计收利息。\"},\n{\"key\":\"card_reissue.working_days\",\"topic\":\"补发新卡时长\",\"value\":7,\"op\":\"=\",\"unit\":\"工作日\",\"condition\":\"挂失后补发新卡\",\"product\":\"示例卡\",\"region\":null,\"channel\":null,\"effective_from\":null,\"quote\":\"持卡人挂失示例卡后，补发新卡的工作日为 7 个工作日，R2 地区由于需要异地制卡，为 10 个工作日。\"},\n{\"key\":\"card_reissue.working_days.r2\",\"topic\":\"补发新卡时长\",\"value\":10,\"op\":\"=\",\"unit\":\"工作日\",\"condition\":\"异地制卡\",\"product\":\"示例卡\",\"region\":\"R2 地区\",\"channel\":null,\"effective_from\":null,\"quote\":\"持卡人挂失示例卡后，补发新卡的工作日为 7 个工作日，R2 地区由于需要异地制卡，为 10 个工作日。\"}\n]}",
+    "reasoning_content": "Extract facts with quotes. Note instruction 4: original text says \"取代此前满8笔的规定\" — only extract current value, old value listed separately with condition \"旧版\".\n\nFacts:\n1. R1 fee waiver: >=6 笔/年, effective 2026-07-01, region R1\n2. Old: 8 笔, condition 旧版\n3. R2: >=12 笔/年, region R2, effective 2026-01-01\n4. Annual fee 300元/年\n5. Cash withdrawal fee 1%, min 10元/笔\n6. Mobile banking daily withdrawal limit 20000元\n7. Counter daily limit 50000元\n8. Interest-free period max 50天\n9. Overdue daily rate 0.05%\n10. Card reissue 7 工作日\n11. R2 10 工作日",
+    "role": "assistant"
+   }
+  }
+ ],
+ "created": 1794240817,
+ "id": "202611100013300a9f313dbe0e461a",
+ "model": "glm-5.3-flashx",
+ "object": "chat.completion",
+ "request_id": "202611100013300a9f313dbe0e461a",
+ "usage": {
+  "completion_tokens": 1257,
+  "completion_tokens_details": {
+   "reasoning_tokens": 196
+  },
+  "prompt_tokens": 685,
+  "prompt_tokens_details": {
+   "cached_tokens": 0
+  },
+  "total_tokens": 1942
+ },
+ "_daxin": {
+  "key": "a17c418227ec5e60ce822a0e",
+  "model": "glm-5.3-flashx",
+  "params": {
+   "max_tokens": 8000,
+   "reasoning_effort": "high",
+   "temperature": 0,
+   "response_format": {
+    "type": "json_object"
+   }
+  },
+  "messages": [
+   {
+    "role": "system",
+    "content": "你是制度条款抽取助手。只从给定的制度原文中抽取可核对的数值型事实（金额、笔数、天数、比例、期限、利率等）。严格要求：1) 每条事实必须附 quote，quote 必须逐字摘自原文（不得改写、不得拼接、不得省略号），且必须包含该事实的数字；2) 不要推测原文没写的内容；3) 同一数字适用于不同产品、地区、渠道时分别列出；4) 原文写明“原为…现调整为…”时只抽现行值，旧值另列并在 condition 注明“旧版”；5) 只输出 JSON，不要任何其他文字。输出格式：{\"facts\":[{\"key\":\"英文小写点分键，如 fee_waiver.min_purchases\",\"topic\":\"主题（中文）\",\"value\":数字,\"op\":\"= 或 <= 或 >=\",\"unit\":\"单位，如 笔/天/元/%/月/年\",\"condition\":\"适用条件（没有则空字符串）\",\"product\":\"产品，原文未限定则 null\",\"region\":\"地区，原文未限定则 null\",\"channel\":\"渠道，原文未限定则 null\",\"effective_from\":\"YYYY-MM-DD，原文未写则 null\",\"quote\":\"逐字摘自原文的句子\"}]}"
+   },
+   {
+    "role": "user",
+    "content": "制度原文：\n【仿真文件】BANK-X 示例卡服务条款（虚构，仅用于测试条款抽取，不代表任何真实机构）\n\n第一章 年费\n第1条 R1 地区示例卡持卡人，自 2026 年 7 月 1 日起，每年消费满 6 笔即可免次年年费。该条款取代此前“满 8 笔”的规定。\n第2条 R2 地区示例卡持卡人，每年消费满 12 笔可免次年年费，R2 地区的标准自 2026 年 1 月 1 日起生效。\n第3条 示例卡年费为每年 300 元。金卡年费另行公告。\n\n第二章 取现与还款\n第4条 示例卡取现手续费为取现金额的 1%，每笔最低收取 10 元。\n第5条 通过手机银行渠道办理的示例卡取现，每日取现限额为 20000 元；柜台渠道每日限额为 50000 元。\n第6条 示例卡免息还款期最长 50 天。逾期还款将按日利率 0.05% 计收利息。\n\n第三章 挂失与补发\n第7条 持卡人挂失示例卡后，补发新卡的工作日为 7 个工作日，R2 地区由于需要异地制卡，为 10 个工作日。\n第8条 挂失申请可通过客服热线随时办理，挂失生效后当日起不再承担被盗刷损失。\n\n第四章 活动说明\n第9条 新户开卡礼活动于 2026 年 12 月 31 日结束，参与活动不影响年费条款。具体礼品以网点公告为准，本行不对礼品价值作出保证。\n第10条 本条款中的数字如与监管规定不一致，以监管规定为准。\n\n\n"
+   }
+  ],
+  "latency_s": 7.81
+ }
+}

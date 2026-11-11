@@ -74,15 +74,15 @@ def test_unreviewed_machine_verdicts_do_not_count(env):
 def test_an_open_high_risk_finding_caps_the_level_until_a_retest_passes(env):
     clause(pol=env[2], key="annual_fee.amount", unit="元", value=200)
     _, _, pol, st = env
-    def add(i, answer, ts):
-        o = obs(i, answer=answer, key="annual_fee.amount", ts=ts); st.add(o); st.save_judgment(classify(o, pol))
+    def add(i, answer, ts, qid=None):
+        o = obs(i, answer=answer, key="annual_fee.amount", ts=ts, question_id=qid or f"Q{i:03d}"); st.add(o); st.save_judgment(classify(o, pol))
         for who in ("甲", "乙"): st.add_review(o.obs_id, who, classify(o, pol).verdict)
     for i in range(1, 100):
         add(i, "年费 200 元", f"2026-11-03 10:{i % 60:02d}")
-    add(200, "年费 150 元", "2026-11-04 10:00")                     # wrong: a money error is R3
+    add(200, "年费 150 元", "2026-11-04 10:00", qid="Q777")        # wrong: a money error is R3
     r = level(env)
     assert r.open_high == 1 and r.level == "L3" and "未关闭" in "；".join(r.reasons)
-    add(201, "年费 200 元", "2026-11-05 10:00")                     # the same question passes later: closed
+    add(201, "年费 200 元", "2026-11-05 10:00", qid="Q777")        # the same question passes later: closed
     r = level(env)
     assert r.open_high == 0 and r.level == "L2"
 
@@ -112,3 +112,38 @@ def test_groups_are_never_pooled(env):
         for who in ("甲", "乙"): st.add_review(o.obs_id, who, "通过")
     rows = {r.region: r for r in matrix(pol, st)}
     assert rows["R1"].level == "L1" and rows["R2"].level in ("L3", "L4")
+
+
+def test_repeating_one_question_is_not_new_evidence(env):
+    setup(env)
+    _, _, pol, st = env
+    for i in range(73):                                  # the same question answered 73 times, all correct
+        o = obs(i + 1, answer="刷满 6 笔免年费", ts=f"2026-11-03 10:{i % 60:02d}", question_id="Q-ONE")
+        st.add(o); st.save_judgment(classify(o, pol))
+        for who in ("甲", "乙"):
+            st.add_review(o.obs_id, who, "通过")
+    r = level(env)
+    assert r.n_raw == 73 and r.n == 3 and r.level == "L4" and "重复作答" in "；".join(r.reasons)
+
+
+def test_one_reviewer_alone_is_not_a_gold_label(env):
+    setup(env)
+    _, _, pol, st = env
+    for i in range(80):
+        o = obs(i + 1, answer="刷满 6 笔免年费", ts=f"2026-11-03 10:{i % 60:02d}")
+        st.add(o); st.save_judgment(classify(o, pol)); st.add_review(o.obs_id, "甲", "通过")
+    r = level(env)
+    assert r.n == 0 and r.level == "L4" and r.unreviewed == 80
+
+
+def test_a_changed_system_fingerprint_discards_older_samples(env):
+    setup(env)
+    _, _, pol, st = env
+    for i in range(60):
+        fp = "old" if i < 30 else "new"
+        o = obs(i + 1, answer="刷满 6 笔免年费", ts=f"2026-11-03 10:{i % 60:02d}", system_fp=fp)
+        st.add(o); st.save_judgment(classify(o, pol))
+        for who in ("甲", "乙"):
+            st.add_review(o.obs_id, who, "通过")
+    r = level(env)
+    assert r.n == 30 and "变更" in "；".join(r.reasons)

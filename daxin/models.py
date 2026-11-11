@@ -29,12 +29,20 @@ class Scope(BaseModel):
         return all(getattr(self, d) is None or getattr(o, d) is None or getattr(self, d) == getattr(o, d) for d in DIMS)
 
 
+class Element(BaseModel):
+    """One required item of a non-numeric standard (a document, a condition). The anchors are words that must appear in an answer
+    that states it; the standard's author chooses them, so a pass never depends on a model's reading."""
+    name: str
+    anchors: list[str]
+
+
 class Fact(BaseModel):
     key: str
     value: Union[float, str]
     op: Literal["=", "<=", ">="] = "="
     unit: str = ""
     condition: str = ""
+    elements: list[Element] = Field(default_factory=list)      # for eligibility / required-document facts; then `value` is just a label
 
 
 class Clause(BaseModel):
@@ -74,6 +82,7 @@ class Observation(BaseModel):
     topic: str = ""
     must_handoff: bool = False
     recorder: str = ""
+    system_fp: str = ""             # fingerprint of the system under test (model, knowledge base, config); '' = unknown. KEEP LAST: DB column order
 
     @property
     def day(self) -> date:

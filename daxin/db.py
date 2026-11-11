@@ -17,7 +17,7 @@ CREATE TRIGGER IF NOT EXISTS clauses_frozen_delete BEFORE DELETE ON clauses WHEN
 CREATE TABLE IF NOT EXISTS observations(
   obs_id TEXT PRIMARY KEY, ts TEXT, inst TEXT, region TEXT, product TEXT, channel TEXT, language TEXT,
   question_id TEXT, session TEXT, turn INTEGER, retest_group TEXT, question TEXT, answer TEXT, answer_sha256 TEXT,
-  fact_key TEXT, topic TEXT, must_handoff INTEGER, recorder TEXT);
+  fact_key TEXT, topic TEXT, must_handoff INTEGER, recorder TEXT, system_fp TEXT DEFAULT '');
 CREATE TRIGGER IF NOT EXISTS obs_no_update BEFORE UPDATE ON observations
   BEGIN SELECT RAISE(ABORT, 'observations are append-only'); END;
 CREATE TRIGGER IF NOT EXISTS obs_no_delete BEFORE DELETE ON observations
@@ -31,10 +31,16 @@ CREATE TABLE IF NOT EXISTS reviews(
   obs_id TEXT NOT NULL, reviewer TEXT NOT NULL, verdict TEXT NOT NULL, ts TEXT, note TEXT, PRIMARY KEY(obs_id, reviewer));
 CREATE TRIGGER IF NOT EXISTS reviews_no_update BEFORE UPDATE ON reviews
   BEGIN SELECT RAISE(ABORT, 'reviews are append-only'); END;
+CREATE TRIGGER IF NOT EXISTS reviews_no_delete BEFORE DELETE ON reviews
+  BEGIN SELECT RAISE(ABORT, 'reviews are append-only'); END;
 
 CREATE TABLE IF NOT EXISTS audit_events(
   seq INTEGER PRIMARY KEY, ts TEXT, actor TEXT, action TEXT, object_type TEXT, object_id TEXT,
   payload_sha256 TEXT, prev_hash TEXT, hash TEXT, mac TEXT);
+CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit_events
+  BEGIN SELECT RAISE(ABORT, 'the audit log is append-only'); END;
+CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit_events
+  BEGIN SELECT RAISE(ABORT, 'the audit log is append-only'); END;
 """
 
 
@@ -44,6 +50,9 @@ class DB:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.conn() as c:
             c.executescript(SCHEMA)
+            cols = {r["name"] for r in c.execute("PRAGMA table_info(observations)")}
+            if "system_fp" not in cols:                       # workspaces made before fingerprints existed
+                c.execute("ALTER TABLE observations ADD COLUMN system_fp TEXT DEFAULT ''")
 
     @contextmanager
     def conn(self):

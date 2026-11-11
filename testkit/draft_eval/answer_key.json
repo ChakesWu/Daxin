@@ -1,0 +1,17 @@
+{
+  "_说明": "仿真答案表，由 Claude 依据 policy_doc_仿真.txt 手工编写，未经人工复核；value+unit 加上所列范围字段即为匹配条件。",
+  "facts": [
+    {"id": "K01", "value": 6, "unit": "笔", "region": "R1", "product": "示例卡", "note": "R1 现行免年费笔数"},
+    {"id": "K02", "value": 8, "unit": "笔", "region": "R1", "product": "示例卡", "note": "R1 旧版（被取代）", "optional": true},
+    {"id": "K03", "value": 12, "unit": "笔", "region": "R2", "product": "示例卡"},
+    {"id": "K04", "value": 300, "unit": "元", "product": "示例卡", "note": "年费"},
+    {"id": "K05", "value": 1, "unit": "%", "product": "示例卡", "note": "取现手续费率"},
+    {"id": "K06", "value": 10, "unit": "元", "product": "示例卡", "note": "取现手续费最低额"},
+    {"id": "K07", "value": 20000, "unit": "元", "product": "示例卡", "channel": "手机银行", "note": "手机银行日取现限额"},
+    {"id": "K08", "value": 50000, "unit": "元", "product": "示例卡", "channel": "柜台", "note": "柜台日取现限额"},
+    {"id": "K09", "value": 50, "unit": "天", "product": "示例卡", "note": "免息期"},
+    {"id": "K10", "value": 0.05, "unit": "%", "product": "示例卡", "note": "逾期日利率"},
+    {"id": "K11", "value": 7, "unit": "工作日", "product": "示例卡", "note": "补发卡（默认）"},
+    {"id": "K12", "value": 10, "unit": "工作日", "region": "R2", "product": "示例卡", "note": "补发卡 R2"}
+  ]
+}

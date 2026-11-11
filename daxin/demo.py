@@ -42,6 +42,7 @@ def simulate(store: Store, start: str, rnd: random.Random, n0: int = 1) -> int:
     k = 0
     def add(*a, **kw):
         nonlocal i, k
+        a = list(a); a[3] = f"{a[3]}-{i % 28:02d}"        # many different questions: repeating one question is not new evidence
         store.add(_obs(i, f"{day(k)} {8 + (k % 25) // 2:02d}:{(k % 2) * 30:02d}", *a, **kw), "simulated-agent"); i += 1; k += 1
     for _ in range(80):                                           # a well-maintained topic
         add("R1", "年费免除", "fee_waiver.min_purchases", "Q001", rnd.choice(["每年刷满 6 笔可免年费。", "刷满六笔免当年年费。", "免年费条件是每年 6 笔交易。"]))
@@ -125,7 +126,7 @@ def simulate_after_change(store: Store, n0: int) -> int:
     i = n0
     for k in range(40):
         store.add(Observation(obs_id=f"S{i:04d}", ts=f"2026-12-{4 + k // 20:02d} {8 + (k % 20) // 2:02d}:{(k % 2) * 30:02d}", inst="BANK-X", region="R1", product="示例卡",
-                              channel="官网" if k % 2 else "APP", language="zh-Hans", question_id="Q008", topic="年费金额", question="（仿真问题）",
+                              channel="官网" if k % 2 else "APP", language="zh-Hans", question_id=f"Q008-{k % 28:02d}", topic="年费金额", question="（仿真问题）",
                               answer="示例卡年费为 220 元。", fact_key="annual_fee.amount", recorder="仿真记录员"), "simulated-agent")
         i += 1
     return i

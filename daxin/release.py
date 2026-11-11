@@ -9,12 +9,14 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date
 
+from .coverage import report as coverage_report
 from .grade import grade
 from .models import ERRORS, SCORED
 from .observe import Store
 from .policy import Policy
 from .stats import wilson
 
+REPEAT_CAP = 3             # one question counts at most this many times toward a sample: repeating a question is not new evidence
 LEVELS = ["L1", "L2", "L3", "L4"]          # L1 most automated ... L4 humans only
 NAME = {"L1": "全自动", "L2": "辅助（AI 起草，人工确认）", "L3": "AI 回答并提示可转人工", "L4": "必须人工"}
 THRESHOLDS = {"L1": (0.95, 73), "L2": (0.90, 35), "L3": (0.80, 1)}   # (Wilson lower bound, minimum n)
@@ -31,7 +33,8 @@ class Row:
     region: str
     channel: str
     language: str
-    n: int = 0
+    n: int = 0              # effective sample size (each question capped at REPEAT_CAP)
+    n_raw: int = 0
     k: int = 0
     lower_bound: float = 0.0
     open_high: int = 0
@@ -41,19 +44,35 @@ class Row:
 
 
 def matrix(policy: Policy, store: Store, today: date | None = None, max_age_days: int = 30,
-           group: tuple[str, ...] = ("topic", "region", "channel", "language")) -> list[Row]:
+           group: tuple[str, ...] = ("topic", "region", "channel", "language"), rule_version: str | None = None) -> list[Row]:
     obs, final = store.observations(), store.final_verdicts()
     groups: dict[tuple, list] = defaultdict(list)
     for o in obs:
         groups[tuple(getattr(o, g) for g in group)].append(o)
     total_scored = sum(1 for o in obs if final.get(o.obs_id) in SCORED) or 1
-    judg = store.judgments()
+    judg = store.judgments(rule_version) if rule_version else store.judgments()
+    cov = coverage_report(policy, store)
     rows = []
     for key, os_ in sorted(groups.items()):
+        fps = {o.system_fp for o in os_ if o.system_fp}
+        changed_note = ""
+        if len(fps) > 1:                       # the system under test changed during the testing: only its newest version counts
+            newest = max((o for o in os_ if o.system_fp), key=lambda o: (o.ts, o.obs_id)).system_fp
+            kept = [o for o in os_ if o.system_fp in ("", newest)]
+            changed_note = f"被测系统在测试期间变更（{len(fps)} 种指纹），只计最新指纹的 {len(kept)} 条，旧样本 {len(os_) - len(kept)} 条不计入"
+            os_ = kept
         r = Row(**dict(zip(group, key)), **{g: "" for g in ("topic", "region", "channel", "language") if g not in group})
         scored = [o for o in os_ if final.get(o.obs_id) in SCORED]
-        r.n = len(scored)
-        r.k = sum(final[o.obs_id] in ERRORS for o in scored)
+        byq: dict[str, list[int]] = defaultdict(lambda: [0, 0])
+        for o in scored:
+            c = byq[o.question_id or o.obs_id]; c[0] += 1; c[1] += final[o.obs_id] in ERRORS
+        r.n_raw = len(scored)
+        r.n = sum(min(nq, REPEAT_CAP) for nq, _ in byq.values())
+        r.k = sum(-(-kq * min(nq, REPEAT_CAP) // nq) for nq, kq in byq.values())          # ceil: errors are never rounded away
+        if changed_note:
+            r.reasons.append(changed_note)
+        if r.n < r.n_raw:
+            r.reasons.append(f"同一题重复作答只计前 {REPEAT_CAP} 次：{r.n_raw} 条折算为 {r.n}")
         r.unreviewed = sum(1 for o in os_ if o.obs_id not in final)
         r.lower_bound = wilson(r.n - r.k, r.n)[0] if r.n else 0.0
         share = r.n / total_scored
@@ -94,8 +113,17 @@ def matrix(policy: Policy, store: Store, today: date | None = None, max_age_days
             ceiling = lower(ceiling, "L3"); r.reasons.append("标准在最近一次测试之后有新版本生效，尚未复测，封顶 L3")
         if today and (today - last).days > max_age_days:
             ceiling = lower(ceiling, "L3"); r.reasons.append(f"最近一次测试已超过 {max_age_days} 天，放行已过期，封顶 L3")
+        cap = cov.get(r.topic).ceiling if cov.get(r.topic) else None
+        if cap:
+            ceiling = lower(ceiling, cap)
+            r.reasons.append(f"该主题有未测事实 {len(cov[r.topic].untested)} 项（{'、'.join(cov[r.topic].untested)}），覆盖不足，封顶 {cap}")
         r.level = lower(level, ceiling)
         if r.unreviewed:
             r.reasons.append(f"另有 {r.unreviewed} 条尚未经人工判定，不计入")
         rows.append(r)
+    if "topic" in group:      # a topic in the standard that nobody has tested at all is never released
+        seen = {row.topic for row in rows}
+        for t, c in sorted(cov.items()):
+            if t not in seen:
+                rows.append(Row(topic=t, region="", channel="", language="", level="L4", reasons=[f"该主题 {len(c.untested)} 项事实完全没有经人工判定的测试"]))
     return rows

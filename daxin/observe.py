@@ -5,10 +5,14 @@ import hashlib
 import json
 from collections import Counter
 
+from . import RULE_VERSION
 from .anonymity import mask_text
 from .audit import Audit
 from .db import DB
 from .models import Judgment, Observation
+
+
+MIN_REVIEWERS = 2        # a verdict counts only when at least this many reviewers have judged the answer and they agree
 
 
 class Store:
@@ -26,8 +30,8 @@ class Store:
             d = o.model_dump()
             d["must_handoff"] = int(d["must_handoff"])
             c.execute(f"INSERT INTO observations VALUES ({','.join('?' * len(d))})", tuple(d.values()))
-        self.audit.append(actor, "observation_recorded", "observation", o.obs_id,
-                          {k: v for k, v in o.model_dump().items() if k not in ("answer", "question")})
+            self.audit.append(actor, "observation_recorded", "observation", o.obs_id,
+                              {k: v for k, v in o.model_dump().items() if k not in ("answer", "question")}, conn=c)
         return True
 
     def observations(self, **where) -> list[Observation]:
@@ -46,10 +50,10 @@ class Store:
                       (j.obs_id, j.rule_version, j.verdict, json.dumps(j.flags), json.dumps(j.claims),
                        json.dumps(j.expected, ensure_ascii=False), j.clause_ref, j.reason))
 
-    def judgments(self, rule_version: str | None = None) -> dict[str, Judgment]:
+    def judgments(self, rule_version: str = RULE_VERSION) -> dict[str, Judgment]:
+        """Machine judgments of ONE rule version (default: the current one). Versions are never mixed: an old rule's verdict is history."""
         with self.db.conn() as c:
-            rows = c.execute("SELECT * FROM judgments" + (" WHERE rule_version=?" if rule_version else ""),
-                             (rule_version,) if rule_version else ()).fetchall()
+            rows = c.execute("SELECT * FROM judgments WHERE rule_version=?", (rule_version,)).fetchall()
         return {r["obs_id"]: Judgment(obs_id=r["obs_id"], rule_version=r["rule_version"], verdict=r["verdict"],
                                       flags=json.loads(r["flags"]), claims=json.loads(r["claims"]),
                                       expected=json.loads(r["expected"]), clause_ref=r["clause_ref"], reason=r["reason"]) for r in rows}
@@ -62,7 +66,7 @@ class Store:
             if c.execute("SELECT 1 FROM reviews WHERE obs_id=? AND reviewer=?", (obs_id, reviewer)).fetchone():
                 return False
             c.execute("INSERT INTO reviews VALUES (?,?,?,?,?)", (obs_id, reviewer, verdict, ts, note))
-        self.audit.append(reviewer, "review_added", "observation", obs_id, {"verdict": verdict})
+            self.audit.append(reviewer, "review_added", "observation", obs_id, {"verdict": verdict}, conn=c)
         return True
 
     def reviews(self) -> dict[str, list[tuple[str, str]]]:
@@ -73,10 +77,13 @@ class Store:
             out.setdefault(r["obs_id"], []).append((r["reviewer"], r["verdict"]))
         return out
 
-    def final_verdicts(self) -> dict[str, str]:
-        """The verdict that counts: all reviewers agree -> that verdict; they disagree -> '待人工' (a dispute is not a result)."""
+    def final_verdicts(self, min_reviewers: int = MIN_REVIEWERS) -> dict[str, str]:
+        """The verdict that counts: at least `min_reviewers` reviewers, all agreeing -> that verdict; they disagree -> '待人工'
+        (a dispute is not a result). One reviewer alone is not a gold label: the answer stays 'not yet reviewed'."""
         out = {}
         for oid, rs in self.reviews().items():
+            if len(rs) < min_reviewers:
+                continue
             vs = Counter(v for _, v in rs)
             out[oid] = next(iter(vs)) if len(vs) == 1 else "待人工"
         return out

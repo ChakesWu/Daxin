@@ -41,7 +41,7 @@ class Policy:
             conn.execute("INSERT INTO clauses VALUES (?,?,?,?,?,?,?,?,?,?)",
                          (c.id, c.version, c.topic, c.text, c.scope.model_dump_json(), json.dumps([f.model_dump() for f in c.facts], ensure_ascii=False),
                           c.effective_from.isoformat(), c.effective_to.isoformat() if c.effective_to else None, "draft", c.source_ref))
-        self.audit.append(actor, "clause_added", "clause", c.ref, c.model_dump(mode="json"))
+            self.audit.append(actor, "clause_added", "clause", c.ref, c.model_dump(mode="json"), conn=conn)     # one transaction with the insert
 
     def _set_status(self, cid: str, version: str, frm: tuple[str, ...], to: str, actor: str) -> None:
         with self.db.conn() as conn:
@@ -51,7 +51,7 @@ class Policy:
             if r["status"] not in frm:
                 raise PolicyError(f"{cid}@{version} is {r['status']}, cannot become {to}")
             conn.execute("UPDATE clauses SET status=? WHERE id=? AND version=?", (to, cid, version))
-        self.audit.append(actor, f"clause_{to}", "clause", f"{cid}@{version}")
+            self.audit.append(actor, f"clause_{to}", "clause", f"{cid}@{version}", conn=conn)
 
     def confirm(self, cid: str, version: str, actor: str) -> None:
         self._set_status(cid, version, ("draft",), "confirmed", actor)
