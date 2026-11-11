@@ -83,12 +83,29 @@ def get_env_line(path: Path, key: str) -> str:
     return ""
 
 
+def fetch_dify(src: Path, tries: int = 3) -> None:
+    """Only the docker/ folder of the pinned release is needed (images are pulled, not built), so fetch just that:
+    a shallow, sparse clone over HTTP/1.1, retried, with any half-finished checkout removed first."""
+    import shutil
+    for i in range(1, tries + 1):
+        if src.exists():
+            shutil.rmtree(src, onerror=lambda f, p, e: (os.chmod(p, 0o700), f(p)))
+        ok = sh("git", "-c", "http.version=HTTP/1.1", "clone", "--depth", "1", "--filter=blob:none", "--sparse",
+                "--branch", DIFY_TAG, DIFY_REPO, str(src), check=False) == 0
+        ok = ok and sh("git", "-c", "http.version=HTTP/1.1", "sparse-checkout", "set", "docker", cwd=src, check=False) == 0
+        if ok and (src / "docker" / "docker-compose.yaml").exists():
+            return
+        print(f"下载未完成（第 {i}/{tries} 次），{5 * i} 秒后重试…", flush=True)
+        time.sleep(5 * i)
+    raise SystemExit("无法从 GitHub 取得 Dify 的 docker 目录：请检查网络或代理后重试 `python deploy/env.py up`。")
+
+
 def cmd_up(_):
     DATA.mkdir(exist_ok=True)
     src = DATA / "dify"
-    if not src.exists():
-        sh("git", "clone", "--depth", "1", "--branch", DIFY_TAG, DIFY_REPO, str(src))
     dk = src / "docker"
+    if not (dk / "docker-compose.yaml").exists():
+        fetch_dify(src)
     env = dk / ".env"
     if not env.exists():
         env.write_text((dk / ".env.example").read_text(encoding="utf-8"), encoding="utf-8")
