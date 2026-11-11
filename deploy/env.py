@@ -114,6 +114,7 @@ def cmd_up(_):
     # publish on loopback only: nobody else on the network can reach the platform
     set_env_line(env, "EXPOSE_NGINX_PORT", f"127.0.0.1:{port()}")
     set_env_line(env, "EXPOSE_NGINX_SSL_PORT", f"127.0.0.1:{int(port()) + 363}")
+    set_env_line(env, "EXPOSE_PLUGIN_DEBUGGING_PORT", "127.0.0.1:5003")
     sh("docker", "compose", "up", "-d", cwd=dk)
     print(f"\n平台启动中（首次需下载镜像，可能要十几分钟）。就绪后打开 http://127.0.0.1:{port()}/install 完成初始设置，"
           f"然后按 deploy/README.md 第 2 步操作。")
