@@ -100,6 +100,22 @@ def fetch_dify(src: Path, tries: int = 3) -> None:
     raise SystemExit("无法从 GitHub 取得 Dify 的 docker 目录：请检查网络或代理后重试 `python deploy/env.py up`。")
 
 
+def pull_images(dk: Path, rounds: int = 8) -> None:
+    """Pull the platform's images one at a time, retrying. A broken connection loses only the layer in flight: layers
+    already downloaded are kept, so each round starts further along. Large images are the ones that fail on a flaky link."""
+    out = subprocess.run(["docker", "compose", "config", "--images"], cwd=dk, capture_output=True, text=True)
+    images = sorted({ln.strip() for ln in out.stdout.splitlines() if ln.strip()})
+    pending = images
+    for r in range(1, rounds + 1):
+        pending = [im for im in pending if sh("docker", "pull", "--quiet", im, check=False) != 0]
+        if not pending:
+            print(f"映像已全部就绪（{len(images)} 个）。", flush=True)
+            return
+        print(f"第 {r}/{rounds} 轮后仍有 {len(pending)} 个映像未完成：{', '.join(pending)}；{10 * r} 秒后重试（已下载的层会保留）。", flush=True)
+        time.sleep(10 * r)
+    raise SystemExit("映像下载仍未完成：网络间歇中断。可直接重跑 `python deploy/env.py up` 续传；已下载的层不会重来。")
+
+
 def cmd_up(_):
     DATA.mkdir(exist_ok=True)
     src = DATA / "dify"
@@ -115,6 +131,7 @@ def cmd_up(_):
     set_env_line(env, "EXPOSE_NGINX_PORT", f"127.0.0.1:{port()}")
     set_env_line(env, "EXPOSE_NGINX_SSL_PORT", f"127.0.0.1:{int(port()) + 363}")
     set_env_line(env, "EXPOSE_PLUGIN_DEBUGGING_PORT", "127.0.0.1:5003")
+    pull_images(dk)
     sh("docker", "compose", "up", "-d", cwd=dk)
     print(f"\n平台启动中（首次需下载镜像，可能要十几分钟）。就绪后打开 http://127.0.0.1:{port()}/install 完成初始设置，"
           f"然后按 deploy/README.md 第 2 步操作。")
