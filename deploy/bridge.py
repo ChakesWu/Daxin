@@ -7,7 +7,8 @@ Why a bridge: the adapter speaks one small protocol and only talks to localhost;
 payload) stays out of the core. The bridge refuses to forward anywhere but a local Dify unless the host is named in
 DAXIN_BRIDGE_UPSTREAM_OK (your own statement that the upstream is yours). It is not a client for anyone else's system.
 
-Every question is a new conversation (no memory carried between questions). The retrieved passages Dify reports are written
+Reasoning text a model returns inline (<think>...</think>) is removed from the answer before it is recorded; the raw reply is kept
+in the log. Every question is a new conversation (no memory carried between questions). The retrieved passages Dify reports are written
 to a JSONL log, so a wrong answer can later be traced to retrieval or to generation. The log stays on this machine.
 
 Environment:
@@ -23,6 +24,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -45,6 +47,21 @@ def check_upstream(base: str) -> str:
     if host not in LOCAL and host not in ok:
         raise BridgeRefused(f"上游 {host} 不是本机：只有你自己架设的平台才可以接入，确认后把主机名写入 DAXIN_BRIDGE_UPSTREAM_OK。")
     return base.rstrip("/")
+
+
+_THINK = re.compile(r"<think>.*?</think>", re.S | re.I)
+
+
+def split_reasoning(raw: str) -> tuple[str, bool, str]:
+    """(answer, had_reasoning, problem). Some models return their chain of thought inline in <think>...</think>. That is not
+    what a customer is meant to read: judged as part of the answer it adds every number the model considered, and a
+    reviewer would be shown the knowledge base contents. The answer is the text outside the tags; the raw text stays in the log.
+    A <think> that never closes means the reply was cut off before any answer: recorded as 'no answer', never as a pass."""
+    had = bool(re.search(r"<think>", raw, re.I))
+    text = _THINK.sub("", raw)
+    if re.search(r"<think>", text, re.I):
+        return "", True, "unclosed_think"
+    return text.replace("</think>", "").strip(), had, ""
 
 
 def kb_manifest(folder: str) -> dict:
@@ -114,10 +131,12 @@ def make_handler(dify: Dify, system: dict, log_path: Path | None):
                 return self._send(400, {"answer": "", "error": "bad_request"})
             if not q:
                 return self._send(400, {"answer": "", "error": "empty_question"})
-            t0, ans, err, sources = time.monotonic(), "", "", []
+            t0, ans, err, sources, raw, had = time.monotonic(), "", "", [], "", False
             try:
                 r = dify.chat(q)
-                ans = str(r.get("answer") or "").strip()
+                raw = str(r.get("answer") or "").strip()
+                ans, had, problem = split_reasoning(raw)
+                err = problem
                 for s in ((r.get("metadata") or {}).get("retriever_resources") or []):
                     sources.append({"document": s.get("document_name", ""), "score": s.get("score"), "position": s.get("position"),
                                     "content_sha": hashlib.sha256(str(s.get("content", "")).encode()).hexdigest()[:16]})
@@ -129,7 +148,7 @@ def make_handler(dify: Dify, system: dict, log_path: Path | None):
                 log_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps({"ts": time.strftime("%Y-%m-%d %H:%M:%S"), "question": q, "answer": ans, "error": err,
-                                        "latency_s": round(time.monotonic() - t0, 2), "sources": sources}, ensure_ascii=False) + "\n")
+                                        **({"raw_answer": raw} if had else {}), "latency_s": round(time.monotonic() - t0, 2), "sources": sources}, ensure_ascii=False) + "\n")
             # an upstream failure is an empty answer: the adapter records 'no answer', never a pass
             self._send(200, {"answer": ans, "system": system, **({"error": err} if err else {})})
     return H
