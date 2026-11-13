@@ -130,7 +130,13 @@ def cmd_up(_):
     # publish on loopback only: nobody else on the network can reach the platform
     set_env_line(env, "EXPOSE_NGINX_PORT", f"127.0.0.1:{port()}")
     set_env_line(env, "EXPOSE_NGINX_SSL_PORT", f"127.0.0.1:{int(port()) + 363}")
-    set_env_line(env, "EXPOSE_PLUGIN_DEBUGGING_PORT", "127.0.0.1:5003")
+    if get_env_line(env, "EXPOSE_PLUGIN_DEBUGGING_PORT").startswith("127.0.0.1"):      # left by an earlier version of this script
+        env.write_text("\n".join(ln for ln in env.read_text(encoding="utf-8").splitlines()
+                                 if not ln.startswith("EXPOSE_PLUGIN_DEBUGGING_PORT=")) + "\n", encoding="utf-8")
+    # The plugin debugging port cannot be bound through its env variable: the API reads the same variable as a plain port
+    # number, so "127.0.0.1:5003" there crash-loops the API (502 on the install page). Restrict it with a compose override.
+    (dk / "docker-compose.override.yaml").write_text(
+        "services:\n  plugin_daemon:\n    ports: !override\n      - \"127.0.0.1:5003:5003\"\n", encoding="utf-8")
     pull_images(dk)
     sh("docker", "compose", "up", "-d", cwd=dk)
     print(f"\n平台启动中（首次需下载镜像，可能要十几分钟）。就绪后打开 http://127.0.0.1:{port()}/install 完成初始设置，"
